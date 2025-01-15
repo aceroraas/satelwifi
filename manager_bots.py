@@ -1,15 +1,40 @@
 #!/usr/bin/env python3
 import os
 import sys
+import subprocess
+import venv
+from pathlib import Path
 
-# Activar entorno virtual
-VENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "venv")
-VENV_PYTHON = os.path.join(VENV_PATH, "bin", "python3")
+def setup_virtual_environment():
+    """Configura el entorno virtual si no existe y lo activa"""
+    venv_path = Path(__file__).parent / "venv"
+    
+    # Crear entorno virtual si no existe
+    if not venv_path.exists():
+        print("🔧 Creando entorno virtual...")
+        venv.create(venv_path, with_pip=True)
+    
+    # Obtener el path del python del entorno virtual
+    if sys.platform == "win32":
+        python_path = venv_path / "Scripts" / "python.exe"
+    else:
+        python_path = venv_path / "bin" / "python"
+    
+    if not python_path.exists():
+        print("❌ Error: No se pudo crear el entorno virtual")
+        sys.exit(1)
 
-if os.path.exists(VENV_PYTHON):
-    if sys.executable != VENV_PYTHON:
-        os.execv(VENV_PYTHON, [VENV_PYTHON] + sys.argv)
+    # Si no estamos en el entorno virtual, reejecutar el script en él
+    if sys.executable != str(python_path):
+        print("🔄 Activando entorno virtual...")
+        subprocess.run([str(python_path), "-m", "pip", "install", "--upgrade", "pip"])
+        subprocess.run([str(python_path), "-m", "pip", "install", "-r", "requirements.txt"])
+        os.execv(str(python_path), [str(python_path)] + sys.argv)
 
+# Configurar entorno virtual antes de cualquier otra importación
+setup_virtual_environment()
+
+# Ahora podemos importar las dependencias
 import time
 import signal
 import logging
@@ -41,8 +66,6 @@ class BotManager:
         self.bot_process = None
         self.should_run = True
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.venv_path = os.path.join(self.base_dir, "venv")
-        self.requirements_file = os.path.join(self.base_dir, "requirements.txt")
         self.mikrotik = MikrotikManager()
         self.last_clear_time = time.time()
         
@@ -58,55 +81,12 @@ class BotManager:
             self.stop_bot()
         sys.exit(0)
     
-    def setup_environment(self):
-        """Configura el entorno virtual y las dependencias"""
-        try:
-            # Crear entorno virtual si no existe
-            if not os.path.exists(self.venv_path):
-                logger.info("Creando entorno virtual...")
-                subprocess.run([sys.executable, "-m", "venv", self.venv_path], check=True)
-            
-            # Obtener la ruta del pip del entorno virtual
-            pip_path = os.path.join(self.venv_path, "bin", "pip")
-            
-            # Actualizar pip
-            logger.info("Actualizando pip...")
-            subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
-            
-            # Instalar dependencias
-            if os.path.exists(self.requirements_file):
-                logger.info("Instalando dependencias...")
-                subprocess.run([pip_path, "install", "-r", self.requirements_file], check=True)
-            
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error al configurar el entorno: {str(e)}")
-            return False
-        except Exception as e:
-            logger.error(f"Error inesperado al configurar el entorno: {str(e)}")
-            return False
-    
-    def activate_venv(self):
-        """Activa el entorno virtual"""
-        if os.path.exists(self.venv_path):
-            activate_script = os.path.join(self.venv_path, "bin", "activate")
-            if os.path.exists(activate_script):
-                os.environ['VIRTUAL_ENV'] = self.venv_path
-                os.environ['PATH'] = os.path.join(self.venv_path, 'bin') + os.pathsep + os.environ['PATH']
-                sys.prefix = self.venv_path
-                return True
-            else:
-                logger.error(f"No se encontró el script de activación: {activate_script}")
-        else:
-            logger.error(f"No se encontró el entorno virtual: {self.venv_path}")
-        return False
-    
     def start_bot(self):
         """Inicia el bot de Telegram"""
         try:
             # Construir el comando con el python del venv
-            python_path = os.path.join(self.venv_path, "bin", "python3")
-            cmd = [python_path, "client_bot.py"]
+            python_path = Path(__file__).parent / "venv" / ("Scripts" if sys.platform == "win32" else "bin") / ("python.exe" if sys.platform == "win32" else "python")
+            cmd = [str(python_path), "client_bot.py"]
             
             # Iniciar el proceso
             self.bot_process = subprocess.Popen(
