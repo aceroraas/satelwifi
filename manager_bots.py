@@ -4,6 +4,13 @@ import sys
 import subprocess
 import venv
 from pathlib import Path
+import time
+import signal
+import logging
+from logging.handlers import RotatingFileHandler
+import traceback
+import re
+from datetime import datetime
 
 def setup_virtual_environment():
     """Configura el entorno virtual si no existe y lo activa"""
@@ -11,7 +18,7 @@ def setup_virtual_environment():
     
     # Crear entorno virtual si no existe
     if not venv_path.exists():
-        print("🔧 Creando entorno virtual...")
+        print("Creando entorno virtual...")
         venv.create(venv_path, with_pip=True)
     
     # Obtener el path del python del entorno virtual
@@ -21,53 +28,126 @@ def setup_virtual_environment():
         python_path = venv_path / "bin" / "python"
     
     if not python_path.exists():
-        print("❌ Error: No se pudo crear el entorno virtual")
+        print("Error: No se pudo crear el entorno virtual")
         sys.exit(1)
 
     # Si no estamos en el entorno virtual, reejecutar el script en él
     if sys.executable != str(python_path):
-        print("🔄 Activando entorno virtual...")
+        print("Activando entorno virtual...")
         subprocess.run([str(python_path), "-m", "pip", "install", "--upgrade", "pip"])
         subprocess.run([str(python_path), "-m", "pip", "install", "-r", "requirements.txt"])
         os.execv(str(python_path), [str(python_path)] + sys.argv)
 
-# Configurar entorno virtual antes de cualquier otra importación
-setup_virtual_environment()
+def setup_logging():
+    """Configura el sistema de logging unificado"""
+    # Crear el formateador para archivo (detallado)
+    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # Crear el formateador para consola (simple)
+    console_formatter = logging.Formatter('%(message)s')
+    
+    # Configurar el manejador de archivo
+    file_handler = RotatingFileHandler('satelwifi.log', maxBytes=10485760, backupCount=5)
+    file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(logging.INFO)
+    
+    # Configurar el manejador de consola
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Configurar el logger raíz
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
 
-# Ahora podemos importar las dependencias
-import time
-import signal
-import logging
-import subprocess
-import traceback
-import re
-from datetime import datetime
-from logging.handlers import RotatingFileHandler
-from mikrotik_manager import MikrotikManager
+    # Configurar loggers específicos con emojis
+    logger_configs = {
+        'client_bot': {'emoji': '🤖', 'name': 'Bot'},
+        'manager': {'emoji': '🛰', 'name': 'Manager'},
+        'mikrotik_manager': {'emoji': '📡', 'name': 'MikroTik'},
+        '__main__': {'emoji': '🔧', 'name': 'Sistema'}
+    }
 
-# Configurar logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+    class EmojiFilter(logging.Filter):
+        def __init__(self, emoji, name):
+            self.emoji = emoji
+            self.name = name
+            super().__init__()
 
-# Handler para archivo
-file_handler = RotatingFileHandler('manager.log', maxBytes=10485760, backupCount=5)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
+        def filter(self, record):
+            record.emoji = self.emoji
+            record.component = self.name
+            return True
 
-# Handler para consola con formato más limpio
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
-logger.addHandler(console_handler)
+    # Crear formateador para consola con emojis
+    emoji_console_formatter = logging.Formatter('%(emoji)s %(component)s: %(message)s')
+    console_handler.setFormatter(emoji_console_formatter)
+
+    # Configurar cada logger específico
+    for logger_name, config in logger_configs.items():
+        logger = logging.getLogger(logger_name)
+        logger.addFilter(EmojiFilter(config['emoji'], config['name']))
+
+def move_cursor_up(lines):
+    """Mover el cursor hacia arriba n líneas"""
+    sys.stdout.write(f"\033[{lines}A")
+    sys.stdout.flush()
+
+def clear_lines(lines):
+    """Limpiar n líneas desde la posición actual del cursor"""
+    for _ in range(lines):
+        sys.stdout.write("\033[2K\r")  # Limpiar línea actual
+        sys.stdout.write("\033[1A")    # Mover cursor arriba
+    sys.stdout.write("\r")             # Volver al inicio
+    sys.stdout.flush()
+
+def print_status(users):
+    """Imprimir el estado del sistema sin limpiar la pantalla"""
+    # Calcular número total de líneas que vamos a imprimir
+    total_lines = 6  # Banner y separadores
+    if users:
+        for user in users:
+            total_lines += 5 if user.get('telegram') else 4
+            total_lines += 1  # Separador
+    else:
+        total_lines += 1  # "No hay usuarios activos"
+    
+    # Limpiar las líneas anteriores
+    clear_lines(total_lines)
+    
+    # Imprimir nueva información
+    print("\n=== 🛰 SatelWifi Manager ===")
+    print("=" * 50)
+    print("\n📊 Estado del Sistema:")
+    print("=" * 50)
+    
+    if users:
+        for user in users:
+            print(f"👤 Usuario: {user['user']}")
+            if user.get('telegram'):
+                print(f"📱 Telegram: {user['telegram']}")
+            print(f"⏱ Tiempo usado: {user['uptime']}")
+            print(f"⏳ Tiempo restante: {user['time_left']}")
+            print(f"📍 IP: {user['address']}")
+            print("-" * 30)
+    else:
+        print("No hay usuarios activos")
+    
+    print("\nPresiona Ctrl+C para salir")
+    print("=" * 50)
 
 class BotManager:
     """Clase para manejar el bot de Telegram"""
     
     def __init__(self):
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.bot_process = None
         self.should_run = True
-        self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.mikrotik = MikrotikManager()
         self.last_clear_time = time.time()
+        self.mikrotik = MikrotikManager()
+        self.last_users = set()  # Para trackear cambios en usuarios
         
         # Configurar el manejador de señales
         signal.signal(signal.SIGTERM, self.handle_shutdown)
@@ -75,7 +155,7 @@ class BotManager:
     
     def handle_shutdown(self, signum, frame):
         """Maneja el apagado graceful del bot"""
-        logger.info("Recibida señal de apagado. Deteniendo bot...")
+        logging.getLogger('manager').info("Recibida señal de apagado. Deteniendo bot...")
         self.should_run = False
         if self.bot_process:
             self.stop_bot()
@@ -96,53 +176,56 @@ class BotManager:
                 cwd=self.base_dir
             )
             
-            logger.info("Bot iniciado exitosamente")
+            logging.getLogger('manager').info("Bot iniciado exitosamente")
             return True
             
         except Exception as e:
-            logger.error(f"Error iniciando bot: {str(e)}")
+            error_msg = f"Error iniciando bot: {str(e)}"
+            log_error(logging.getLogger('manager'), error_msg)
             return False
     
     def stop_bot(self):
         """Detiene el proceso del bot"""
         try:
             if self.bot_process:
-                logger.info("Deteniendo bot...")
+                logging.getLogger('manager').info("Deteniendo bot...")
                 try:
                     # Intentar obtener cualquier salida pendiente con más tiempo de espera
                     stdout, stderr = self.bot_process.communicate(timeout=5)
                     if stdout:
-                        logger.info(f"Últimas líneas de salida:\n{stdout}")
+                        logging.getLogger('manager').info(f"Últimas líneas de salida:\n{stdout}")
                     if stderr:
-                        logger.error(f"Últimos errores:\n{stderr}")
+                        logging.getLogger('manager').error(f"Últimos errores:\n{stderr}")
                 except subprocess.TimeoutExpired:
-                    logger.warning("No se pudo obtener la salida del proceso, procediendo a terminar")
+                    logging.getLogger('manager').warning("No se pudo obtener la salida del proceso, procediendo a terminar")
                 
                 # Intentar terminar el proceso gracefully
                 self.bot_process.terminate()
                 try:
                     self.bot_process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    logger.warning("El bot no se detuvo gracefully, forzando cierre...")
+                    logging.getLogger('manager').warning("El bot no se detuvo gracefully, forzando cierre...")
                     # Matar cualquier proceso relacionado
                     try:
                         subprocess.run(['pkill', '-f', 'client_bot.py'], check=False)
                     except Exception as e:
-                        logger.error(f"Error al matar procesos: {str(e)}")
+                        error_msg = f"Error al matar procesos: {str(e)}"
+                        log_error(logging.getLogger('manager'), error_msg)
                     
                     # Forzar cierre del proceso principal
                     self.bot_process.kill()
                     try:
                         self.bot_process.wait(timeout=2)
                     except subprocess.TimeoutExpired:
-                        logger.error("No se pudo matar el proceso completamente")
+                        logging.getLogger('manager').error("No se pudo matar el proceso completamente")
                 
                 self.bot_process = None
-                logger.info("Bot detenido exitosamente")
+                logging.getLogger('manager').info("Bot detenido exitosamente")
                 return True
                 
         except Exception as e:
-            logger.error(f"Error al detener el bot: {str(e)}\n{traceback.format_exc()}")
+            error_msg = f"Error al detener el bot: {str(e)}\n{traceback.format_exc()}"
+            log_error(logging.getLogger('manager'), error_msg)
         return False
     
     def check_bot_status(self):
@@ -155,187 +238,137 @@ class BotManager:
             # Intentar obtener cualquier error que causó la detención
             stdout, stderr = self.bot_process.communicate()
             if stderr:
-                logger.error(f"El bot se detuvo con error:\n{stderr}")
+                logging.getLogger('manager').error(f"El bot se detuvo con error:\n{stderr}")
             return False
         
         return True
     
     def check_active_users(self):
-        """Verifica y muestra los usuarios activos solo si hay cambios"""
+        """Verifica y muestra usuarios activos"""
         try:
             # Obtener usuarios activos
             users = self.mikrotik.get_active_users()
+            logger = logging.getLogger('manager')
             
-            # Verificar si hay cambios en los logs
-            try:
-                with open('manager.log', 'r') as f:
-                    manager_logs = f.readlines()
-                with open('client_bot.log', 'r') as f:
-                    bot_logs = f.readlines()
-                
-                # Usar los últimos logs como parte del hash
-                logs_hash = hash(''.join(manager_logs[-10:] + bot_logs[-10:]))
-            except Exception as e:
-                logger.error(f"Error leyendo logs: {str(e)}")
-                logs_hash = 0
+            # Convertir usuarios actuales a set para comparación
+            current_users = {user['user'] for user in users}
             
-            # Calcular hash combinado de usuarios y logs
-            current_hash = hash(str(users) + str(logs_hash))
+            # Detectar cambios
+            new_users = current_users - self.last_users
+            disconnected_users = self.last_users - current_users
             
-            # Actualizar si hay cambios
-            if current_hash != self.last_users_hash:
-                self.last_users_hash = current_hash
-                
-                # Limpiar pantalla y mostrar banner
-                os.system('clear')
-                print("\n=== 🛰 SatelWifi Manager ===")
-                print("=" * 50)
-                
-                # Mostrar últimos logs del manager
-                print("\n📝 Logs del Manager:")
-                print("=" * 50)
-                try:
-                    with open('manager.log', 'r') as f:
-                        logs = f.readlines()
-                        for log in logs[-5:]:  # Mostrar últimos 5 logs
-                            print(log.strip())
-                except Exception as e:
-                    print(f"Error leyendo logs del manager: {str(e)}")
-                
-                # Mostrar últimos logs del client_bot
-                print("\n📱 Logs del Bot:")
-                print("=" * 50)
-                try:
-                    with open('client_bot.log', 'r') as f:
-                        logs = f.readlines()
-                        for log in logs[-5:]:  # Mostrar últimos 5 logs
-                            print(log.strip())
-                except Exception as e:
-                    print(f"Error leyendo logs del bot: {str(e)}")
-                
-                print("\n" + "=" * 50)
-                
-                # Mostrar usuarios activos
-                print("\n👥 Usuarios del Sistema:")
-                print("=" * 50)
-                
-                if not users:
-                    print("\n📭 No hay usuarios activos")
-                else:
-                    for user in users:
-                        status = "🟢" if user['is_active'] else "⚪️"
-                        print(f"\n{status} Usuario: {user['user']}")
-                        print(f"📱 Telegram: {user['telegram']}")
-                        print(f"⏱ Tiempo usado: {user['uptime']}")
-                        print(f"⏳ Tiempo restante: {user['time_left']}")
-                        print(f"🌐 IP: {user['address']}")
-                        print("➖" * 25)
-                
-                print("\nPresiona Ctrl+C para salir")
-                print("=" * 50)
-        
-        except Exception as e:
-            logger.error(f"Error verificando usuarios activos: {str(e)}")
-
-    def check_and_clear_screen(self):
-        """Limpia la pantalla cada 5 minutos y muestra los últimos logs"""
-        current_time = time.time()
-        if current_time - self.last_clear_time > 300:  # 300 segundos = 5 minutos
+            # Registrar cambios en el log
+            for user in new_users:
+                logger.info(f"Usuario conectado: {user}")
+            
+            for user in disconnected_users:
+                logger.info(f"Usuario desconectado: {user}")
+            
+            # Actualizar lista de usuarios
+            self.last_users = current_users
+            
+            # Mostrar estado actual
             os.system('clear')
             print("\n=== 🛰 SatelWifi Manager ===")
             print("=" * 50)
             
-            # Mostrar últimos logs
-            try:
-                print("\n📝 Últimos logs del Manager:")
-                print("=" * 50)
-                with open('manager.log', 'r') as f:
-                    logs = f.readlines()
-                    for log in logs[-5:]:
-                        print(log.strip())
-            except Exception as e:
-                print(f"Error leyendo logs del manager: {str(e)}")
-            
-            try:
-                print("\n🤖 Últimos logs del Bot:")
-                print("=" * 50)
-                with open('client_bot.log', 'r') as f:
-                    logs = f.readlines()
-                    for log in logs[-5:]:
-                        print(log.strip())
-            except Exception as e:
-                print(f"Error leyendo logs del bot: {str(e)}")
-            
-            print("\nMonitoreando logs y usuarios...")
-            print("Presiona Ctrl+C para salir")
+            # Mostrar estado del sistema
+            print("\n📊 Estado del Sistema:")
             print("=" * 50)
             
-            self.last_clear_time = current_time
-
-    def monitor_bot_output(self):
-        """Monitorea la salida del bot"""
-        if not self.bot_process:
-            return
-            
-        # Leer la salida del bot
-        stdout_line = self.bot_process.stdout.readline() if self.bot_process.stdout else None
-        if stdout_line:
-            msg = stdout_line.decode('utf-8').strip()
-            print(f"🤖 {msg}")  # Mostrar directamente en consola
-        
-        stderr_line = self.bot_process.stderr.readline() if self.bot_process.stderr else None
-        if stderr_line:
-            error_msg = stderr_line.decode('utf-8').strip()
-            if "Conflict: terminated by other getUpdates request" in error_msg:
-                logger.warning("Detectada otra instancia del bot. Deteniendo esta instancia...")
-                self.stop_bot()
-                sys.exit(1)
+            if users:
+                for user in users:
+                    print(f"👤 Usuario: {user['user']}")
+                    if user.get('telegram'):
+                        print(f"📱 Telegram: {user['telegram']}")
+                    print(f"⏱ Tiempo usado: {user['uptime']}")
+                    print(f"⏳ Tiempo restante: {user['time_left']}")
+                    print(f"📍 IP: {user['address']}")
+                    print("-" * 30)
             else:
-                print(f"❌ Error: {error_msg}")  # Mostrar error en consola
+                print("No hay usuarios activos")
+                print("-" * 30)
+            
+            print("\n📝 Últimos eventos del sistema:")
+            print("=" * 50)
+            
+            # Mostrar últimos logs
+            try:
+                with open('satelwifi.log', 'r') as f:
+                    logs = f.readlines()
+                    if logs:
+                        for log in logs[-5:]:
+                            print(log.strip())
+            except Exception as e:
+                pass
+            
+            print("\nPresiona Ctrl+C para salir")
+            print("=" * 50)
+            
+        except Exception as e:
+            error_msg = f"Error verificando usuarios activos: {str(e)}"
+            log_error(logging.getLogger('manager'), error_msg)
 
     def run(self):
         """Ejecuta el manager"""
+        logger = logging.getLogger('manager')
         logger.info("Iniciando BotManager...")
         
         try:
             # Iniciar el bot
             if self.start_bot():
-                os.system('clear')
-                print("\n=== 🛰 SatelWifi Manager ===")
-                print("=" * 50)
-                print("\nMonitoreando logs y usuarios...")
-                print("Presiona Ctrl+C para salir")
-                print("=" * 50 + "\n")
-                
-                while True:
+                # Bucle principal
+                while self.should_run:
                     try:
-                        # Limpiar pantalla periódicamente
-                        self.check_and_clear_screen()
+                        # Verificar estado del bot
+                        if not self.check_bot_status():
+                            logger.warning("Bot no responde, intentando reiniciar...")
+                            if not self.start_bot():
+                                error_msg = "No se pudo reiniciar el bot"
+                                log_error(logger, error_msg)
+                                break
                         
-                        # Monitorear salida del bot
-                        self.monitor_bot_output()
+                        # Verificar y mostrar usuarios activos
+                        self.check_active_users()
                         
-                        # Pequeña pausa para no consumir CPU
-                        time.sleep(0.1)
+                        # Esperar 2 segundos antes de actualizar
+                        time.sleep(2)
                         
                     except Exception as e:
-                        logger.error(f"Error en el monitoreo: {str(e)}")
-                        time.sleep(5)
+                        error_msg = f"Error en el monitoreo: {str(e)}"
+                        log_error(logger, error_msg)
+                        time.sleep(2)
             else:
-                logger.error("No se pudo iniciar el bot")
+                error_msg = "No se pudo iniciar el bot"
+                log_error(logger, error_msg)
         except Exception as e:
-            logger.error(f"Error en el manager: {str(e)}\n{traceback.format_exc()}")
+            error_msg = f"Error en el manager: {str(e)}\n{traceback.format_exc()}"
+            log_error(logger, error_msg)
         finally:
+            logger.info("Deteniendo BotManager...")
             self.stop_bot()
 
+def log_error(logger, error_msg):
+    """Función auxiliar para mostrar y registrar errores"""
+    logger.error(error_msg)
+
 def main():
-    """Función principal"""
     try:
         manager = BotManager()
         manager.run()
     except Exception as e:
-        logger.error(f"Error fatal en el manager: {str(e)}\n{traceback.format_exc()}")
+        error_msg = f"Error fatal en el manager: {str(e)}\n{traceback.format_exc()}"
+        log_error(logging.getLogger('__main__'), error_msg)
         sys.exit(1)
 
 if __name__ == "__main__":
+    # Configurar entorno virtual antes de cualquier importación
+    setup_virtual_environment()
+
+    # Configurar sistema de logs
+    setup_logging()
+
+    # Importar después de configurar el entorno virtual
+    from mikrotik_manager import MikrotikManager
+
     main()

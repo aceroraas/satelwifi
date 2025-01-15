@@ -14,16 +14,9 @@ from mikrotik_manager import MikrotikManager
 from logging.handlers import RotatingFileHandler
 
 # Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        RotatingFileHandler('client_bot.log', maxBytes=10485760, backupCount=5),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+logger = logging.getLogger('client_bot')
 
-logger = logging.getLogger(__name__)
+# No configuramos handlers aquí porque los heredará del logger raíz
 
 # Agregar logging para el manager
 manager_logger = logging.getLogger('manager')

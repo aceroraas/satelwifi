@@ -4,7 +4,10 @@ from config import MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASSWORD
 import re
 import traceback
 
-logger = logging.getLogger(__name__)
+# Configurar logging
+logger = logging.getLogger('mikrotik_manager')
+
+# No configuramos handlers aquí porque los heredará del logger raíz
 
 class MikrotikManager:
     """Clase para manejar las operaciones con MikroTik"""
