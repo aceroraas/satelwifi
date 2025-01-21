@@ -100,7 +100,8 @@ class MikrotikManager:
                     'time_left': time_left,
                     'is_active': is_active,
                     'address': active_dict[username].get('address', 'N/A') if is_active else 'N/A',
-                    'id': user.get('.id', '')  # Necesario para el botón de eliminar
+                    'id': user.get('.id', ''),  # Necesario para el botón de eliminar
+                    'total_time_consumed': user.get('uptime', '0s')  # Tiempo total consumido
                 })
             
             return formatted_users
@@ -124,7 +125,8 @@ class MikrotikManager:
             response += (
                 f"{status} <b>Usuario:</b> <code>{user['user']}</code>\n"
                 f"👤 <b>Telegram:</b> {telegram}\n"
-                f"⏱ <b>Tiempo:</b> {user['uptime']}\n"
+                f"⏱ <b>Tiempo actual:</b> {user['uptime']}\n"
+                f"⏱ <b>Tiempo total consumido:</b> {user['total_time_consumed']}\n"
                 f"⏳ <b>Restante:</b> {user['time_left']}\n"
                 f"📍 <b>IP:</b> {user['address']}\n"
                 "••••••••••\n"
@@ -214,3 +216,5 @@ class MikrotikManager:
             return False
         finally:
             self.disconnect()
+            self.disconnect()
+
