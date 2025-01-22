@@ -23,6 +23,9 @@ fixed_price_usd = float(os.getenv('FIXED_PRICE_USD', '0.185701021'))  # Precio f
 # Planes disponibles en horas
 time_plans = [1, 2, 4, 12, 24]
 
+# Tiempo de refresco de la consola en segundos
+REFRESH_INTERVAL = int(os.getenv('REFRESH_INTERVAL', '5'))
+
 def calculate_prices():
     """Calcula los precios para cada plan"""
     prices = {}

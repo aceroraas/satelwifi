@@ -36,7 +36,15 @@ def setup_virtual_environment():
         print("Activando entorno virtual...")
         subprocess.run([str(python_path), "-m", "pip", "install", "--upgrade", "pip"])
         subprocess.run([str(python_path), "-m", "pip", "install", "-r", "requirements.txt"])
+        subprocess.run([str(python_path), "-m", "pip", "install", "python-dotenv"])  # Instalar python-dotenv
         os.execv(str(python_path), [str(python_path)] + sys.argv)
+    else:
+        # Asegurarse de que python-dotenv esté instalado
+        subprocess.run([str(python_path), "-m", "pip", "install", "python-dotenv"])
+
+# Importar ADMIN_IDS después de configurar el entorno virtual
+setup_virtual_environment()
+from config import ADMIN_IDS, REFRESH_INTERVAL  # Importar REFRESH_INTERVAL
 
 def setup_logging():
     """Configura el sistema de logging unificado"""
@@ -134,6 +142,46 @@ def print_status(users):
             print("-" * 30)
     else:
         print("No hay usuarios activos")
+    
+    print("\nPresiona Ctrl+C para salir")
+    print("=" * 50)
+
+def print_system_status(users):
+    """Imprime el estado del sistema en la consola"""
+    os.system('clear')
+    print("\n=== 🛰 SatelWifi Manager ===")
+    print("=" * 50)
+    
+    # Mostrar estado del sistema
+    print("\n📊 Estado del Sistema:")
+    print("=" * 50)
+    
+    if users:
+        for user in users:
+            print(f"👤 Usuario: {user['user']}")
+            if user.get('telegram'):
+                print(f"📱 Telegram: {user['telegram']}")
+            print(f"⏱ Tiempo de ticket: {user['uptime']}")
+            print(f"⏱ Tiempo consumido: {user['total_time_consumed']}")
+            print(f"⏳ Tiempo restante: {user['time_left']}")
+            print(f"📍 IP: {user['address']}")
+            print("-" * 30)
+    else:
+        print("No hay usuarios activos")
+        print("-" * 30)
+    
+    print("\n📝 Últimos eventos del sistema:")
+    print("=" * 50)
+    
+    # Mostrar últimos logs
+    try:
+        with open('satelwifi.log', 'r') as f:
+            logs = f.readlines()
+            if logs:
+                for log in logs[-5:]:
+                    print(log.strip())
+    except Exception as e:
+        pass
     
     print("\nPresiona Ctrl+C para salir")
     print("=" * 50)
@@ -267,47 +315,38 @@ class BotManager:
             # Actualizar lista de usuarios
             self.last_users = current_users
             
+            # Verificar y eliminar usuarios cuyo tiempo restante ha expirado
+            expired_users = [user for user in users if user['time_left'] != 'sin límite' and self.mikrotik.time_to_seconds(user['time_left']) <= 0]
+            if expired_users:
+                self.mikrotik.check_and_remove_expired_users()
+                self.notify_admins_expired_users(expired_users)
+            
             # Mostrar estado actual
-            os.system('clear')
-            print("\n=== 🛰 SatelWifi Manager ===")
-            print("=" * 50)
-            
-            # Mostrar estado del sistema
-            print("\n📊 Estado del Sistema:")
-            print("=" * 50)
-            
-            if users:
-                for user in users:
-                    print(f"👤 Usuario: {user['user']}")
-                    if user.get('telegram'):
-                        print(f"📱 Telegram: {user['telegram']}")
-                    print(f"⏱ Tiempo usado: {user['uptime']}")
-                    print(f"⏳ Tiempo restante: {user['time_left']}")
-                    print(f"📍 IP: {user['address']}")
-                    print("-" * 30)
-            else:
-                print("No hay usuarios activos")
-                print("-" * 30)
-            
-            print("\n📝 Últimos eventos del sistema:")
-            print("=" * 50)
-            
-            # Mostrar últimos logs
-            try:
-                with open('satelwifi.log', 'r') as f:
-                    logs = f.readlines()
-                    if logs:
-                        for log in logs[-5:]:
-                            print(log.strip())
-            except Exception as e:
-                pass
-            
-            print("\nPresiona Ctrl+C para salir")
-            print("=" * 50)
+            print_system_status(users)
             
         except Exception as e:
             error_msg = f"Error verificando usuarios activos: {str(e)}"
             log_error(logging.getLogger('manager'), error_msg)
+
+    def notify_admins_expired_users(self, expired_users):
+        """Notifica a los administradores sobre usuarios cuyo tiempo restante ha expirado"""
+        for admin_id in ADMIN_IDS:
+            for user in expired_users:
+                self.send_message_safe(
+                    admin_id,
+                    f"⏳ El tiempo del usuario {user['user']} ha expirado.\n"
+                    f"Por favor, considera eliminarlo manualmente si no se elimina automáticamente."
+                )
+
+    def send_message_safe(self, chat_id, text, **kwargs):
+        """Envía un mensaje de forma segura, manejando errores comunes"""
+        try:
+            # Aquí deberías implementar la lógica para enviar mensajes a los administradores
+            # Por ejemplo, podrías usar un bot de Telegram para enviar mensajes
+            # self.bot.send_message(chat_id, text, **kwargs)
+            print(f"Mensaje enviado a {chat_id}: {text}")
+        except Exception as e:
+            logging.getLogger('manager').error(f"Error enviando mensaje: {str(e)}")
 
     def run(self):
         """Ejecuta el manager"""
@@ -331,13 +370,13 @@ class BotManager:
                         # Verificar y mostrar usuarios activos
                         self.check_active_users()
                         
-                        # Esperar 2 segundos antes de actualizar
-                        time.sleep(2)
+                        # Esperar el tiempo de refresco antes de actualizar
+                        time.sleep(REFRESH_INTERVAL)
                         
                     except Exception as e:
                         error_msg = f"Error en el monitoreo: {str(e)}"
                         log_error(logger, error_msg)
-                        time.sleep(2)
+                        time.sleep(REFRESH_INTERVAL)
             else:
                 error_msg = "No se pudo iniciar el bot"
                 log_error(logger, error_msg)

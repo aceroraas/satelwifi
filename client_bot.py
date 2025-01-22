@@ -577,6 +577,16 @@ class SatelWifiBot:
                     "❌ Error al procesar la solicitud"
                 )
     
+    def notify_admins_expired_users(self, expired_users):
+        """Notifica a los administradores sobre usuarios cuyo tiempo restante ha expirado"""
+        for admin_id in ADMIN_IDS:
+            for user in expired_users:
+                self.send_message_safe(
+                    admin_id,
+                    f"⏳ El tiempo del usuario {user['user']} ha expirado.\n"
+                    f"Por favor, considera eliminarlo manualmente si no se elimina automáticamente."
+                )
+    
     def run(self):
         """Inicia el bot"""
         logger.info("Iniciando bot...")

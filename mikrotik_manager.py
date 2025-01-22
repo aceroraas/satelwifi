@@ -80,6 +80,16 @@ class MikrotikManager:
                 if is_active:
                     uptime = active_dict[username].get('uptime', '0s')
                 
+                # Calcular tiempo restante
+                if time_left != 'sin límite':
+                    time_left_seconds = self.time_to_seconds(time_left)
+                    uptime_seconds = self.time_to_seconds(user.get('uptime', '0s'))
+                    remaining_seconds = max(time_left_seconds - uptime_seconds, 0)
+                    time_left = self.seconds_to_readable(remaining_seconds)
+                
+                # Convertir tiempo de ticket a formato legible
+                ticket_time = self.seconds_to_readable(self.time_to_seconds(user.get('limit-uptime', '0s')))
+                
                 # Intentar obtener el nombre de usuario de Telegram del log
                 telegram_user = "Unknown"
                 try:
@@ -96,7 +106,7 @@ class MikrotikManager:
                 formatted_users.append({
                     'user': username,
                     'telegram': telegram_user,
-                    'uptime': uptime,
+                    'uptime': ticket_time if 'limit-uptime' in user else '0s',  # Verificar si limit-uptime está presente
                     'time_left': time_left,
                     'is_active': is_active,
                     'address': active_dict[username].get('address', 'N/A') if is_active else 'N/A',
@@ -122,12 +132,17 @@ class MikrotikManager:
             status = "🟢" if user['is_active'] else "⚪️"
             telegram = user['telegram'] if user['telegram'] != "Unknown" else "No registrado"
             
+            # Calcular tiempo restante
+            time_left = user['time_left']
+            total_time_consumed = user['total_time_consumed']
+            ticket_time = user['uptime']
+            
             response += (
                 f"{status} <b>Usuario:</b> <code>{user['user']}</code>\n"
                 f"👤 <b>Telegram:</b> {telegram}\n"
-                f"⏱ <b>Tiempo actual:</b> {user['uptime']}\n"
-                f"⏱ <b>Tiempo total consumido:</b> {user['total_time_consumed']}\n"
-                f"⏳ <b>Restante:</b> {user['time_left']}\n"
+                f"⏱ <b>Tiempo de ticket:</b> {ticket_time}\n"
+                f"⏱ <b>Tiempo consumido:</b> {total_time_consumed}\n"
+                f"⏳ <b>Tiempo restante:</b> {time_left}\n"
                 f"📍 <b>IP:</b> {user['address']}\n"
                 "••••••••••\n"
             )
@@ -217,4 +232,59 @@ class MikrotikManager:
         finally:
             self.disconnect()
             self.disconnect()
+    
+    def check_and_remove_expired_users(self):
+        """Verifica y elimina usuarios cuyo tiempo restante ha expirado"""
+        try:
+            # Conectar a MikroTik
+            self.connect()
+            
+            # Obtener usuarios y conexiones activas
+            users = self.api.get_resource("/ip/hotspot/user").get()
+            active_connections = self.api.get_resource("/ip/hotspot/active").get()
+            
+            # Crear diccionario de conexiones activas para búsqueda rápida
+            active_dict = {conn.get('user', ''): conn for conn in active_connections}
+            
+            for user in users:
+                username = user.get('name', '')
+                is_active = username in active_dict
+                
+                # Obtener información de tiempo
+                time_left = user.get('limit-uptime', 'sin límite')
+                total_time_consumed = user.get('uptime', '0s')
+                
+                # Verificar si el tiempo restante es 0 o negativo
+                if time_left != 'sin límite' and self.time_to_seconds(time_left) <= 0:
+                    # Verificar si ha pasado más de 1 minuto desde que se acabó el tiempo
+                    if self.time_to_seconds(total_time_consumed) - self.time_to_seconds(time_left) > 60:
+                        logger.info(f"Eliminando usuario {username} por tiempo expirado")
+                        self.remove_user(username)
+                    else:
+                        logger.warning(f"Usuario {username} con tiempo expirado, pero no ha pasado más de 1 minuto")
+            
+        except Exception as e:
+            logger.error(f"Error verificando usuarios expirados: {str(e)}")
+        finally:
+            self.disconnect()
+
+    def time_to_seconds(self, time_str):
+        """Convierte una cadena de tiempo en segundos"""
+        time_units = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
+        return sum(int(num) * time_units[unit] for num, unit in re.findall(r'(\d+)([smhd])', time_str))
+
+    def seconds_to_readable(self, seconds):
+        """Convierte segundos a un formato legible"""
+        periods = [
+            ('día', 86400),
+            ('hora', 3600),
+            ('minuto', 60),
+            ('segundo', 1)
+        ]
+        parts = []
+        for period_name, period_seconds in periods:
+            if seconds >= period_seconds:
+                period_value, seconds = divmod(seconds, period_seconds)
+                parts.append(f"{period_value} {period_name}{'s' if period_value > 1 else ''}")
+        return ', '.join(parts)
 
