@@ -83,7 +83,7 @@ class MikrotikManager:
                 # Calcular tiempo restante
                 if time_left != 'sin límite':
                     time_left_seconds = self.time_to_seconds(time_left)
-                    uptime_seconds = self.time_to_seconds(user.get('uptime', '0s'))
+                    uptime_seconds = self.time_to_seconds(uptime)
                     remaining_seconds = max(time_left_seconds - uptime_seconds, 0)
                     time_left = self.seconds_to_readable(remaining_seconds)
                 
@@ -111,7 +111,7 @@ class MikrotikManager:
                     'is_active': is_active,
                     'address': active_dict[username].get('address', 'N/A') if is_active else 'N/A',
                     'id': user.get('.id', ''),  # Necesario para el botón de eliminar
-                    'total_time_consumed': user.get('uptime', '0s')  # Tiempo total consumido
+                    'total_time_consumed': uptime if is_active else user.get('uptime', '0s')  # Tiempo total consumido
                 })
             
             return formatted_users
