@@ -217,7 +217,11 @@ class MikrotikManager:
     def create_user(self, username, password, limit_uptime):
         """Crea un nuevo usuario"""
         try:
-            self.connect()
+            if not self.connect():
+                logger.error("No se pudo conectar a MikroTik")
+                return False
+
+            logger.info(f"Creando usuario {username} con límite de tiempo {limit_uptime}")
             self.api.get_resource("/ip/hotspot/user").add(
                 name=username,
                 password=password,
@@ -227,10 +231,9 @@ class MikrotikManager:
             logger.info(f"Usuario {username} creado con perfil 5M")
             return True
         except Exception as e:
-            logger.error(f"Error creando usuario: {str(e)}")
+            logger.error(f"Error creando usuario: {str(e)}\n{traceback.format_exc()}")
             return False
         finally:
-            self.disconnect()
             self.disconnect()
     
     def check_and_remove_expired_users(self):
@@ -287,4 +290,3 @@ class MikrotikManager:
                 period_value, seconds = divmod(seconds, period_seconds)
                 parts.append(f"{period_value} {period_name}{'s' if period_value > 1 else ''}")
         return ', '.join(parts)
-

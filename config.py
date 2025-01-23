@@ -23,9 +23,6 @@ fixed_price_usd = float(os.getenv('FIXED_PRICE_USD', '0.185701021'))  # Precio f
 # Planes disponibles en horas
 time_plans = [1, 2, 4, 12, 24]
 
-# Tiempo de refresco de la consola en segundos
-REFRESH_INTERVAL = int(os.getenv('REFRESH_INTERVAL', '5'))
-
 def calculate_prices():
     """Calcula los precios para cada plan"""
     prices = {}
@@ -40,6 +37,10 @@ def calculate_prices():
 
 # Generar precios
 PRICES = calculate_prices()
+
+# Configuración de credenciales de administrador
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
 
 # Configuración de información de pagos
 PAYMENT_INFO = {

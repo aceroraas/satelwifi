@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel Admin - SatelWifi</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div id="app" v-cloak class="container mx-auto p-4">
+        <!-- Header con botón de logout -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Panel de Administración</h1>
+            <a href="{{ url_for('logout') }}" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                Cerrar Sesión
+            </a>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex">
+                    <button @click="currentTab = 'requests'"
+                            :class="{'border-blue-500 text-blue-600': currentTab === 'requests'}"
+                            class="py-2 px-4 border-b-2 font-medium">
+                        Solicitudes
+                    </button>
+                    <button @click="currentTab = 'active-users'"
+                            :class="{'border-blue-500 text-blue-600': currentTab === 'active-users'}"
+                            class="py-2 px-4 border-b-2 font-medium">
+                        Usuarios Activos
+                    </button>
+                    <button @click="currentTab = 'logs'"
+                            :class="{'border-blue-500 text-blue-600': currentTab === 'logs'}"
+                            class="py-2 px-4 border-b-2 font-medium">
+                        Logs del Sistema
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Solicitudes Tab -->
+        <div v-if="currentTab === 'requests'" class="bg-white shadow rounded p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Solicitudes Pendientes</h2>
+                <button @click="fetchRequests" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    <i class="fas fa-sync"></i> Actualizar
+                </button>
+            </div>
+            <div v-if="Object.keys(pendingRequests).length === 0" class="text-center text-gray-500 py-8">
+                No hay solicitudes pendientes
+            </div>
+            <div v-else>
+                <div v-for="(request, id) in pendingRequests" :key="id" class="border rounded p-4 mb-4">
+                    <div class="flex justify-between">
+                        <div>
+                            <h3 class="font-bold">[[ 'Solicitud #' + id ]]</h3>
+                            <p>[[ 'Plan: ' + (request.plan_data?.name || 'No especificado') ]]</p>
+                            <p>[[ 'Duración: ' + (request.plan_data?.duration || 0) + ' minutos' ]]</p>
+                            <p>[[ 'Ref. Pago: ' + (request.payment_ref || 'No especificada') ]]</p>
+                            <p>[[ 'Estado: ' + (request.status || 'pendiente') ]]</p>
+                            <p>[[ 'Fecha: ' + new Date(request.created_at).toLocaleString() ]]</p>
+                        </div>
+                        <div v-if="request.status === 'pending'" class="space-x-2">
+                            <button @click="approveRequest(id)" 
+                                    class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                                Aprobar
+                            </button>
+                            <button @click="rejectRequest(id)"
+                                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                                Rechazar
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="request.payment_proof" class="mt-4">
+                        <img :src="request.payment_proof" class="max-w-xs rounded">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios Activos Tab -->
+        <div v-if="currentTab === 'active-users'" class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Usuarios Activos</h3>
+                <button @click="fetchActiveUsers" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    <i class="fas fa-sync"></i> Actualizar
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-4 py-2">Usuario</th>
+                            <th class="px-4 py-2">Telegram</th>
+                            <th class="px-4 py-2">Estado</th>
+                            <th class="px-4 py-2">Tiempo Consumido</th>
+                            <th class="px-4 py-2">Tiempo Total</th>
+                            <th class="px-4 py-2">Tiempo Restante</th>
+                            <th class="px-4 py-2">IP</th>
+                            <th class="px-4 py-2">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="user in activeUsers" :key="user.username" 
+                            :class="{
+                                'bg-green-50': user.isActive,
+                                'hover:bg-gray-50': !user.isActive,
+                                'border-b': true
+                            }">
+                            <td class="px-4 py-2 font-medium">[[ user.username ]]</td>
+                            <td class="px-4 py-2">
+                                <span :class="{'text-blue-600': user.telegramUser !== 'Unknown'}">
+                                    [[ user.telegramUser === 'Unknown' ? 'No registrado' : user.telegramUser ]]
+                                </span>
+                            </td>
+                            <td class="px-4 py-2">
+                                <span :class="{
+                                    'px-2 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-green-100 text-green-800': user.isActive,
+                                    'bg-gray-100 text-gray-800': !user.isActive
+                                }">
+                                    [[ user.isActive ? 'Conectado' : 'Desconectado' ]]
+                                </span>
+                            </td>
+                            <td class="px-4 py-2" :class="{'text-gray-500': user.uptime === 'Sin actividad'}">
+                                [[ user.uptime ]]
+                            </td>
+                            <td class="px-4 py-2" :class="{'text-gray-500': user.totalTime === 'Sin límite'}">
+                                [[ user.totalTime ]]
+                            </td>
+                            <td class="px-4 py-2" 
+                                :class="{
+                                    'text-red-600': user.timeLeft === 'Agotado',
+                                    'text-gray-500': user.timeLeft === 'Sin límite' || user.timeLeft === 'Error en formato',
+                                    'font-medium': user.isActive && user.timeLeft !== 'Agotado' && user.timeLeft !== 'Sin límite'
+                                }">
+                                [[ user.timeLeft ]]
+                            </td>
+                            <td class="px-4 py-2" :class="{'text-gray-500': user.ipAddress === 'Sin IP'}">
+                                [[ user.ipAddress ]]
+                            </td>
+                            <td class="px-4 py-2">
+                                <button @click="deleteUser(user.username)"
+                                        class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors">
+                                    Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                        <tr v-if="activeUsers.length === 0">
+                            <td colspan="9" class="px-4 py-2 text-center text-gray-500">
+                                No hay usuarios registrados
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div v-if="currentTab === 'logs'" class="space-y-6">
+            <!-- System Logs -->
+            <div class="bg-white shadow rounded p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Logs del Sistema</h2>
+                    <button @click="fetchSystemLogs" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <i class="fas fa-sync"></i> Actualizar
+                    </button>
+                </div>
+
+                <!-- Client Bot Logs -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Client Bot Logs</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Nivel</th>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Mensaje</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr v-for="log in clientBotLogs" :key="log.timestamp" 
+                                    :class="getLogRowClass(log.level)">
+                                    <td class="py-2 text-sm">[[ log.timestamp ]]</td>
+                                    <td class="py-2 text-sm">[[ log.level ]]</td>
+                                    <td class="py-2 text-sm">[[ log.message ]]</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Manager Logs -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Manager Logs</h3>
+                    <div class="bg-gray-50 rounded-lg p-4 max-h-[300px] overflow-y-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Nivel</th>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Mensaje</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr v-for="log in serverLogs" :key="log.timestamp" 
+                                    :class="getLogRowClass(log.level)">
+                                    <td class="py-2 text-sm">[[ log.timestamp ]]</td>
+                                    <td class="py-2 text-sm">[[ log.level ]]</td>
+                                    <td class="py-2 text-sm">[[ log.message ]]</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estilos para v-cloak -->
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+
+    <!-- Scripts al final del body -->
+    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script>
+        // Esperar a que el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            const { createApp } = Vue;
+            const app = createApp({
+                delimiters: ['[[', ']]'],
+                data() {
+                    return {
+                        currentTab: 'requests',
+                        pendingRequests: {},
+                        activeUsers: [],
+                        clientBotLogs: [],
+                        managerLogs: [],
+                        serverLogs: [],
+                        updateInterval: null
+                    }
+                },
+                methods: {
+                    getLogRowClass(level) {
+                        if (!level) return ''
+                        switch(level.toLowerCase()) {
+                            case 'error': return 'bg-red-50'
+                            case 'warning': return 'bg-yellow-50'
+                            case 'info': return 'bg-blue-50'
+                            default: return ''
+                        }
+                    },
+                    async fetchRequests() {
+                        try {
+                            const response = await fetch('/api/admin/requests')
+                            if (!response.ok) {
+                                throw new Error('Error al obtener las solicitudes')
+                            }
+                            const data = await response.json()
+                            if (typeof data === 'object' && data !== null) {
+                                this.pendingRequests = data
+                            } else {
+                                console.error('Formato de datos inválido:', data)
+                                this.pendingRequests = {}
+                            }
+                        } catch (error) {
+                            console.error('Error fetching requests:', error)
+                            this.pendingRequests = {}
+                            alert('Error al cargar las solicitudes: ' + error.message)
+                        }
+                    },
+                    async fetchActiveUsers() {
+                        try {
+                            const response = await fetch('/api/admin/users')
+                            if (!response.ok) {
+                                throw new Error('Error al obtener usuarios activos')
+                            }
+                            const data = await response.json()
+                            this.activeUsers = Array.isArray(data) ? data : []
+                        } catch (error) {
+                            console.error('Error fetching active users:', error)
+                            this.activeUsers = []
+                            alert('Error al cargar usuarios activos: ' + error.message)
+                        }
+                    },
+                    async approveRequest(id) {
+                        if (!confirm('¿Estás seguro de que deseas aprobar esta solicitud?')) {
+                            return
+                        }
+                        try {
+                            const response = await fetch(`/api/admin/requests/${id}/approve`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                            if (!response.ok) {
+                                const errorData = await response.json()
+                                throw new Error(errorData.error || 'Error al aprobar la solicitud')
+                            }
+                            const data = await response.json()
+                            // Actualizar la lista de solicitudes
+                            await this.fetchRequests()
+                            alert(`Solicitud aprobada correctamente. Ticket: ${data.ticket}`)
+                        } catch (error) {
+                            console.error('Error approving request:', error)
+                            alert('Error al aprobar la solicitud: ' + error.message)
+                        }
+                    },
+                    async rejectRequest(id) {
+                        if (!confirm('¿Estás seguro de que deseas rechazar esta solicitud?')) {
+                            return
+                        }
+                        try {
+                            const response = await fetch(`/api/admin/requests/${id}/reject`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                            if (!response.ok) {
+                                const errorData = await response.json()
+                                throw new Error(errorData.error || 'Error al rechazar la solicitud')
+                            }
+                            // Actualizar la lista de solicitudes
+                            await this.fetchRequests()
+                            alert('Solicitud rechazada correctamente')
+                        } catch (error) {
+                            console.error('Error rejecting request:', error)
+                            alert('Error al rechazar la solicitud: ' + error.message)
+                        }
+                    },
+                    async deleteUser(username) {
+                        if (!confirm(`¿Estás seguro de que deseas eliminar al usuario ${username}?`)) {
+                            return
+                        }
+                        try {
+                            const response = await fetch(`/api/admin/users/${username}`, {
+                                method: 'DELETE'
+                            })
+                            if (!response.ok) {
+                                const errorData = await response.json()
+                                throw new Error(errorData.error || 'Error al eliminar usuario')
+                            }
+                            await this.fetchActiveUsers()
+                            alert('Usuario eliminado correctamente')
+                        } catch (error) {
+                            console.error('Error deleting user:', error)
+                            alert('Error al eliminar usuario: ' + error.message)
+                        }
+                    },
+                    async fetchSystemLogs() {
+                        try {
+                            const response = await fetch('/api/admin/system-status')
+                            const data = await response.json()
+                            this.clientBotLogs = data.logs || []
+                            this.serverLogs = []
+                        } catch (error) {
+                            console.error('Error fetching system logs:', error)
+                            this.clientBotLogs = []
+                            this.serverLogs = []
+                        }
+                    },
+                    startAutoUpdate() {
+                        this.stopAutoUpdate()
+                        this.updateInterval = setInterval(() => {
+                            if (this.currentTab === 'requests') {
+                                this.fetchRequests()
+                            } else if (this.currentTab === 'active-users') {
+                                this.fetchActiveUsers()
+                            } else if (this.currentTab === 'logs') {
+                                this.fetchSystemLogs()
+                            }
+                        }, 5000) // Actualizar cada 5 segundos en lugar de 30
+                    },
+                    stopAutoUpdate() {
+                        if (this.updateInterval) {
+                            clearInterval(this.updateInterval)
+                            this.updateInterval = null
+                        }
+                    }
+                },
+                async created() {
+                    try {
+                        await Promise.all([
+                            this.fetchRequests(),
+                            this.fetchActiveUsers(),
+                            this.fetchSystemLogs()
+                        ])
+                    } catch (error) {
+                        console.error('Error initializing data:', error)
+                    }
+                    this.startAutoUpdate()
+                },
+                beforeUnmount() {
+                    this.stopAutoUpdate()
+                }
+            })
+
+            app.mount('#app')
+        })
+    </script>
+</body>
+</html>
