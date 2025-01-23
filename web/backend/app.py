@@ -18,6 +18,7 @@ from telebot import types
 from pathlib import Path
 from logger_manager import get_logger
 from flask import send_from_directory
+import uuid
 
 # Inicializar el logger
 logger = get_logger('web_backend')
@@ -44,6 +45,35 @@ app.logger.handlers = []
 for handler in logger.handlers:
     app.logger.addHandler(handler)
 app.logger.setLevel(logger.level)
+
+# Configuración de la carpeta de uploads
+UPLOAD_FOLDER = Path(__file__).parent / 'static' / 'uploads' / 'payment_proofs'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_payment_proof(base64_string):
+    """Guarda una imagen de comprobante de pago y retorna la ruta"""
+    try:
+        if ',' in base64_string:
+            base64_string = base64_string.split(',')[1]
+        
+        # Decodificar base64 a bytes
+        image_data = base64.b64decode(base64_string)
+        
+        # Generar nombre único para el archivo
+        filename = f"{uuid.uuid4()}.jpg"
+        file_path = UPLOAD_FOLDER / filename
+        
+        # Guardar archivo
+        with open(file_path, 'wb') as f:
+            f.write(image_data)
+        
+        return str(file_path.relative_to(Path(__file__).parent))
+    except Exception as e:
+        logger.error(f'Error guardando imagen: {str(e)}')
+        return None
 
 def login_required(f):
     @wraps(f)
@@ -199,29 +229,29 @@ def submit_request():
         # Generar ID único para la solicitud
         request_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         
-        # Procesar imagen del comprobante
-        payment_proof = None
+        # Procesar y guardar imagen del comprobante
+        payment_proof_path = None
         if data['paymentProof']:
-            try:
-                # Remover el prefijo del base64 si existe
-                if ',' in data['paymentProof']:
-                    payment_proof = data['paymentProof'].split(',')[1]
-                else:
-                    payment_proof = data['paymentProof']
-            except Exception as e:
-                logger.error(f'Error procesando imagen: {str(e)}')
-                return jsonify({'error': 'Error procesando imagen del comprobante'}), 400
+            payment_proof_path = save_payment_proof(data['paymentProof'])
+            if not payment_proof_path:
+                return jsonify({'error': 'Error al guardar el comprobante'}), 500
         
         # Guardar la solicitud en la base de datos
         success = db.add_request(
             request_id=request_id,
             plan_data=data['plan'],
             payment_ref=data['paymentRef'],
-            payment_proof=payment_proof,
+            payment_proof=payment_proof_path,
             source='web'
         )
         
         if not success:
+            # Si falla la base de datos, eliminar la imagen si se guardó
+            if payment_proof_path:
+                try:
+                    os.remove(Path(__file__).parent / payment_proof_path)
+                except:
+                    pass
             return jsonify({'error': 'Error al guardar la solicitud'}), 500
         
         # Notificar a los administradores
@@ -250,19 +280,12 @@ def submit_request():
                 )
                 
                 # Enviar comprobante si existe
-                if payment_proof:
-                    import io
-                    import base64
+                if payment_proof_path:
                     try:
-                        # Convertir base64 a bytes
-                        image_bytes = base64.b64decode(payment_proof)
-                        # Crear un objeto BytesIO
-                        image_stream = io.BytesIO(image_bytes)
-                        # Enviar la imagen
-                        bot.bot.send_photo(admin_id, image_stream)
+                        with open(Path(__file__).parent / payment_proof_path, 'rb') as photo:
+                            bot.bot.send_photo(admin_id, photo)
                     except Exception as e:
                         logger.error(f'Error enviando comprobante a admin {admin_id}: {str(e)}')
-                        # Enviar mensaje de error pero continuar con la solicitud
                         bot.bot.send_message(admin_id, "❌ Error al enviar el comprobante de pago")
             except Exception as e:
                 logger.error(f'Error enviando notificación a admin {admin_id}: {str(e)}')
@@ -605,17 +628,15 @@ def system_logs():
         logger.error(f"Error reading system logs: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/image/<filename>')
+@app.route('/api/admin/image/<path:filename>')
 @login_required
 def serve_image(filename):
     """Sirve las imágenes de los comprobantes"""
     try:
-        # Directorio de imágenes relativo a la ubicación del script
-        image_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'images')
-        return send_from_directory(image_dir, filename)
+        return send_from_directory(UPLOAD_FOLDER, filename)
     except Exception as e:
-        logger.error(f"Error sirviendo imagen {filename}: {str(e)}")
-        return jsonify({'error': str(e)}), 404
+        logger.error(f'Error sirviendo imagen {filename}: {str(e)}')
+        return 'Imagen no encontrada', 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

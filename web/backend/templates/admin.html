@@ -74,7 +74,7 @@
                     </div>
                     <div class="py-2">
                         <div v-if="request.payment_proof" class="w-32 h-32">
-                            <img :src="'data:image/jpeg;base64,' + request.payment_proof" 
+                            <img :src="'/api/admin/image/' + request.payment_proof.split('/').pop()" 
                                 @error="(e) => e.target.src = '/static/img/placeholder.png'"
                                 alt="Comprobante" 
                                 style="max-width: 100px; cursor: pointer;"

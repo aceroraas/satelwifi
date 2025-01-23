@@ -93,7 +93,7 @@ class DatabaseManager:
                     datetime.now().isoformat(),
                     json.dumps(plan_data),
                     payment_ref,
-                    payment_proof,
+                    payment_proof,  # Ahora payment_proof será la ruta del archivo
                     source,
                     chat_id,
                     username

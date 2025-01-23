@@ -46,10 +46,8 @@ class SatelWifiBot:
         if is_admin:
             markup.row("👥 Usuarios Activos")
             markup.row("📝 Solicitudes Pendientes", "🎫 Generar Ticket")
-            markup.row("ℹ️ Información")
         else:
             markup.row("🎫 Solicitar Ticket")
-            markup.row("ℹ️ Información")
         return markup
     
     def send_message_safe(self, chat_id, text, reply_to_message_id=None, **kwargs):
@@ -148,8 +146,7 @@ class SatelWifiBot:
                     self.reply_safe(
                         message,
                         "¡Bienvenido a SATELWIFI! 🛜\n\n"
-                        "🎫 Solicitar Ticket - Comprar nuevo ticket\n"
-                        "ℹ️ Información - Ver precios y planes",
+                        "🎫 Solicitar Ticket - Comprar nuevo ticket",
                         reply_markup=markup
                     )
             except Exception as e:
@@ -188,40 +185,40 @@ class SatelWifiBot:
                 # Obtener usuarios activos
                 users = self.mikrotik.get_active_users()
                 
-                # Crear mensaje y markup
-                text = self.mikrotik.format_active_users(users)
-                markup = types.InlineKeyboardMarkup(row_width=1)
-                
-                # Agregar botón de eliminar para cada usuario activo
-                buttons_added = False
+                if not users:
+                    self.reply_safe(message, "📝 No hay usuarios activos en este momento.")
+                    return
+
+                # Crear mensaje con la información de usuarios
+                text = "👥 *Usuarios Activos:*\n\n"
                 for user in users:
-                    if user['user'] != 'default-trial':  # Permitir eliminar usuarios inactivos también
+                    if user['user'] != 'default-trial':
+                        uptime = user.get('uptime', 'N/A')
+                        bytes_in = float(user.get('bytes-in', 0)) / (1024*1024)  # Convertir a MB
+                        bytes_out = float(user.get('bytes-out', 0)) / (1024*1024)  # Convertir a MB
+                        
+                        text += f"🎫 *Usuario:* `{user['user']}`\n"
+                        text += f"⏱ *Tiempo conectado:* {uptime}\n"
+                        text += f"📥 *Descarga:* {bytes_in:.2f} MB\n"
+                        text += f"📤 *Subida:* {bytes_out:.2f} MB\n"
+                        text += f"📍 *IP:* {user.get('address', 'N/A')}\n"
+                        text += "➖➖➖➖➖➖➖➖➖➖\n"
+
+                # Crear markup con botones para eliminar usuarios
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                for user in users:
+                    if user['user'] != 'default-trial':
                         button_text = f"❌ Eliminar {user['user']}"
                         callback_data = f"delete_user_{user['user']}"
-                        self.logger.info(f"Agregando botón para eliminar usuario: {user['user']}")
-                        markup.add(types.InlineKeyboardButton(
-                            text=button_text,
-                            callback_data=callback_data
-                        ))
-                        buttons_added = True
-                
-                if not buttons_added:
-                    self.logger.info("No se agregaron botones al markup")
-                
-                # Enviar mensaje con botones
-                try:
-                    self.send_message_safe(
-                        message.chat.id,
-                        text,
-                        reply_markup=markup if buttons_added else None,
-                        parse_mode='HTML'
-                    )
-                    self.logger.info("Mensaje enviado con éxito")
-                except Exception as e:
-                    self.logger.error(f"Error al enviar mensaje: {str(e)}")
-                    raise
-                
-                self.logger.info(f"Lista de usuarios activos mostrada a {message.from_user.username}")
+                        markup.add(types.InlineKeyboardButton(button_text, callback_data=callback_data))
+
+                # Enviar mensaje con la información y botones
+                self.send_message_safe(
+                    message.chat.id,
+                    text,
+                    reply_markup=markup,
+                    parse_mode='Markdown'
+                )
                 
             except Exception as e:
                 self.logger.error(f"Error mostrando usuarios activos: {str(e)}")
