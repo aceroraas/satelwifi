@@ -192,37 +192,39 @@ class SatelWifiBot:
                 # Crear mensaje con la información de usuarios
                 text = "👥 *Usuarios Activos:*\n\n"
                 for user in users:
-                    if user['user'] != 'default-trial':
+                    if user.get('user') and user['user'] != 'default-trial':
+                        # Información básica
+                        text += f"🎫 *Usuario:* `{user['user']}`\n"
+                        
+                        # Usuario de Telegram
+                        telegram_user = user.get('telegram_user', 'No disponible')
+                        text += f"👤 *Telegram:* {telegram_user}\n"
+                        
+                        # Tiempo de conexión
                         uptime = user.get('uptime', 'N/A')
+                        text += f"⏱ *Tiempo conectado:* {uptime}\n"
+                        
+                        # Tiempo del ticket y restante
+                        ticket_time = user.get('ticket_time', 'N/A')
+                        time_left = user.get('time_left', 'N/A')
+                        text += f"🎟 *Tiempo total:* {ticket_time}\n"
+                        text += f"⏳ *Tiempo restante:* {time_left}\n"
+                        
+                        # Uso de datos
                         bytes_in = float(user.get('bytes-in', 0)) / (1024*1024)  # Convertir a MB
                         bytes_out = float(user.get('bytes-out', 0)) / (1024*1024)  # Convertir a MB
+                        text += f"📥 *Datos recibidos:* {bytes_in:.2f} MB\n"
+                        text += f"📤 *Datos enviados:* {bytes_out:.2f} MB\n"
+                        text += f"📊 *Total datos:* {(bytes_in + bytes_out):.2f} MB\n"
                         
-                        text += f"🎫 *Usuario:* `{user['user']}`\n"
-                        text += f"⏱ *Tiempo conectado:* {uptime}\n"
-                        text += f"📥 *Descarga:* {bytes_in:.2f} MB\n"
-                        text += f"📤 *Subida:* {bytes_out:.2f} MB\n"
-                        text += f"📍 *IP:* {user.get('address', 'N/A')}\n"
-                        text += "➖➖➖➖➖➖➖➖➖➖\n"
+                        # Separador entre usuarios
+                        text += "\n" + "─" * 20 + "\n\n"
 
-                # Crear markup con botones para eliminar usuarios
-                markup = types.InlineKeyboardMarkup(row_width=1)
-                for user in users:
-                    if user['user'] != 'default-trial':
-                        button_text = f"❌ Eliminar {user['user']}"
-                        callback_data = f"delete_user_{user['user']}"
-                        markup.add(types.InlineKeyboardButton(button_text, callback_data=callback_data))
-
-                # Enviar mensaje con la información y botones
-                self.send_message_safe(
-                    message.chat.id,
-                    text,
-                    reply_markup=markup,
-                    parse_mode='Markdown'
-                )
-                
+                # Enviar mensaje con parse_mode markdown para el formato
+                self.reply_safe(message, text, parse_mode='Markdown')
             except Exception as e:
                 self.logger.error(f"Error mostrando usuarios activos: {str(e)}")
-                self.reply_safe(message, "❌ Error al obtener usuarios activos")
+                self.reply_safe(message, "❌ Error al mostrar usuarios activos. Por favor, intenta nuevamente.")
         
         # Ver solicitudes pendientes
         @self.bot.message_handler(func=lambda message: message.text == "📝 Solicitudes Pendientes" and self.is_admin(message.from_user.id))
