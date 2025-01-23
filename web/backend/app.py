@@ -415,6 +415,24 @@ def system_status():
         logger.error(f'Error al obtener estado del sistema: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/clear-logs', methods=['POST'])
+@login_required
+def clear_logs():
+    """Limpia los logs del sistema"""
+    try:
+        # Limpiar archivo de log
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'satelwifi.log')
+        if os.path.exists(log_path):
+            with open(log_path, 'w') as f:
+                f.write('')  # Vaciar el archivo
+            logger.info("Logs limpiados correctamente")
+            return jsonify({'message': 'Logs limpiados correctamente'})
+        else:
+            return jsonify({'message': 'No hay archivo de logs para limpiar'})
+    except Exception as e:
+        logger.error(f"Error limpiando logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/admin')
 @app.route('/admin/')
 @login_required
@@ -555,58 +573,36 @@ def submit_refund():
 @app.route('/api/admin/system-logs')
 @login_required
 def system_logs():
-    """Obtiene los logs del sistema de diferentes archivos"""
+    """Obtiene los logs del sistema del archivo centralizado"""
     try:
-        def read_log_file(filename):
-            logs = []
-            try:
-                with open(filename, 'r') as f:
-                    lines = f.readlines()
-                    for line in lines[-50:]:  # Últimas 50 líneas
-                        try:
-                            # Intentar parsear como JSON primero
-                            log_data = json.loads(line)
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'satelwifi.log')
+        logs = []
+        
+        if os.path.exists(log_path):
+            with open(log_path, 'r') as f:
+                for line in f.readlines()[-1000:]:  # Obtener las últimas 1000 líneas
+                    try:
+                        # Parsear la línea de log
+                        # Formato: timestamp - name - level - message
+                        parts = line.strip().split(' - ', 3)
+                        if len(parts) >= 4:
+                            timestamp, name, level, message = parts
                             logs.append({
-                                'timestamp': log_data.get('timestamp', ''),
-                                'level': log_data.get('type', 'info'),
-                                'message': line.strip()
+                                'timestamp': timestamp,
+                                'source': name,
+                                'level': level,
+                                'message': message
                             })
-                        except json.JSONDecodeError:
-                            # Si no es JSON, intentar extraer información del texto
-                            if ':' in line:
-                                parts = line.split(':', 1)
-                                timestamp = parts[0].strip()
-                                message = parts[1].strip()
-                                level = 'info'
-                                if 'error' in line.lower():
-                                    level = 'error'
-                                elif 'warning' in line.lower():
-                                    level = 'warning'
-                                logs.append({
-                                    'timestamp': timestamp,
-                                    'level': level,
-                                    'message': message
-                                })
-            except Exception as e:
-                print(f"Error leyendo {filename}: {e}")
-            return logs
-
-        # Leer los diferentes archivos de log
-        client_bot_logs = read_log_file('client_bot.log')
-        manager_logs = read_log_file('manager.log')
-        server_logs = read_log_file('server.log')
+                    except Exception as e:
+                        logger.error(f"Error parsing log line: {str(e)}")
+                        continue
         
         return jsonify({
-            'clientBotLogs': client_bot_logs,
-            'managerLogs': manager_logs,
-            'serverLogs': server_logs
+            'logs': logs
         })
-        
     except Exception as e:
-        print(f"Error obteniendo logs del sistema: {e}")
-        return jsonify({
-            'error': str(e)
-        }), 500
+        logger.error(f"Error reading system logs: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
