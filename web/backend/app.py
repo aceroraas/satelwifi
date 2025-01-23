@@ -17,6 +17,7 @@ import re
 from telebot import types
 from pathlib import Path
 from logger_manager import get_logger
+from flask import send_from_directory
 
 # Inicializar el logger
 logger = get_logger('web_backend')
@@ -603,6 +604,18 @@ def system_logs():
     except Exception as e:
         logger.error(f"Error reading system logs: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/image/<filename>')
+@login_required
+def serve_image(filename):
+    """Sirve las imágenes de los comprobantes"""
+    try:
+        # Directorio de imágenes relativo a la ubicación del script
+        image_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'images')
+        return send_from_directory(image_dir, filename)
+    except Exception as e:
+        logger.error(f"Error sirviendo imagen {filename}: {str(e)}")
+        return jsonify({'error': str(e)}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

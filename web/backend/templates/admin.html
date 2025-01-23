@@ -72,8 +72,17 @@
                             </button>
                         </div>
                     </div>
-                    <div v-if="request.payment_proof" class="mt-4">
-                        <img :src="request.payment_proof" class="max-w-xs rounded">
+                    <div class="py-2">
+                        <div v-if="request.payment_proof" class="w-32 h-32">
+                            <img :src="'data:image/jpeg;base64,' + request.payment_proof" 
+                                @error="(e) => e.target.src = '/static/img/placeholder.png'"
+                                alt="Comprobante" 
+                                style="max-width: 100px; cursor: pointer;"
+                                @click="(e) => window.open(e.target.src, '_blank')">
+                        </div>
+                        <div v-else class="text-gray-500">
+                            Sin imagen
+                        </div>
                     </div>
                 </div>
             </div>
@@ -237,6 +246,9 @@
                             case 'info': return 'bg-blue-50'
                             default: return ''
                         }
+                    },
+                    handleImageError(event) {
+                        event.target.src = '/static/images/no-image.png'
                     },
                     async fetchRequests() {
                         try {
