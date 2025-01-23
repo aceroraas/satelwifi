@@ -3,11 +3,10 @@ import routeros_api
 from config import MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASSWORD
 import re
 import traceback
+from logger_manager import get_logger
 
-# Configurar logging
-logger = logging.getLogger('mikrotik_manager')
-
-# No configuramos handlers aquí porque los heredará del logger raíz
+# Usar el nuevo sistema de logging centralizado
+logger = get_logger('mikrotik_manager')
 
 class MikrotikManager:
     """Clase para manejar las operaciones con MikroTik"""
@@ -58,60 +57,58 @@ class MikrotikManager:
     def get_active_users(self):
         """Obtiene información de usuarios activos"""
         try:
-            # Conectar a MikroTik
-            self.connect()
-            
+            if not self.connect():
+                return []
+
             # Obtener usuarios y conexiones activas
-            users = self.api.get_resource("/ip/hotspot/user").get()
-            active_connections = self.api.get_resource("/ip/hotspot/active").get()
-            
-            # Crear diccionario de conexiones activas para búsqueda rápida
-            active_dict = {conn.get('user', ''): conn for conn in active_connections}
-            
-            # Formatear la respuesta
+            users = self.get_users()
+            active_connections = self.get_active_connections()
+
+            # Crear diccionario de conexiones activas
+            active_dict = {conn['user']: conn for conn in active_connections}
             formatted_users = []
+
             for user in users:
                 username = user.get('name', '')
+                if not username:
+                    continue
+
+                # Verificar si el usuario está activo
                 is_active = username in active_dict
-                
-                # Obtener información de tiempo
-                uptime = "0s"
-                time_left = user.get('limit-uptime', 'sin límite')
-                if is_active:
-                    uptime = active_dict[username].get('uptime', '0s')
+                uptime = active_dict[username].get('uptime', '0s') if is_active else '0s'
+
+                # Obtener tiempo del ticket
+                ticket_time = user.get('limit-uptime', '0s')
                 
                 # Calcular tiempo restante
-                if time_left != 'sin límite':
-                    time_left_seconds = self.time_to_seconds(time_left)
-                    uptime_seconds = self.time_to_seconds(uptime)
-                    remaining_seconds = max(time_left_seconds - uptime_seconds, 0)
+                try:
+                    total_seconds = self.time_to_seconds(ticket_time)
+                    used_seconds = self.time_to_seconds(user.get('uptime', '0s'))
+                    remaining_seconds = max(0, total_seconds - used_seconds)
                     time_left = self.seconds_to_readable(remaining_seconds)
-                
-                # Convertir tiempo de ticket a formato legible
-                ticket_time = self.seconds_to_readable(self.time_to_seconds(user.get('limit-uptime', '0s')))
-                
-                # Intentar obtener el nombre de usuario de Telegram del log
+                except Exception as e:
+                    logger.error(f"Error calculando tiempo para usuario {username}: {str(e)}")
+                    time_left = "Error"
+
+                # Intentar obtener el usuario de Telegram
                 telegram_user = "Unknown"
                 try:
-                    with open('manager.log', 'r') as f:
-                        for line in f:
-                            if username in line and "Ticket aprobado" in line:
-                                match = re.search(r'Usuario: (@\w+)', line)
-                                if match:
-                                    telegram_user = match.group(1)
-                                break
+                    if user.get('comment'):
+                        telegram_match = re.search(r'@(\w+)', user.get('comment', ''))
+                        if telegram_match:
+                            telegram_user = f"@{telegram_match.group(1)}"
                 except Exception as e:
-                    logger.error(f"Error leyendo log para usuario {username}: {str(e)}")
+                    logger.error(f"Error obteniendo usuario de Telegram para {username}: {str(e)}")
 
                 formatted_users.append({
                     'user': username,
                     'telegram': telegram_user,
-                    'uptime': ticket_time if 'limit-uptime' in user else '0s',  # Verificar si limit-uptime está presente
+                    'uptime': ticket_time if 'limit-uptime' in user else '0s',
                     'time_left': time_left,
                     'is_active': is_active,
                     'address': active_dict[username].get('address', 'N/A') if is_active else 'N/A',
-                    'id': user.get('.id', ''),  # Necesario para el botón de eliminar
-                    'total_time_consumed': uptime if is_active else user.get('uptime', '0s')  # Tiempo total consumido
+                    'id': user.get('.id', ''),
+                    'total_time_consumed': uptime if is_active else user.get('uptime', '0s')
                 })
             
             return formatted_users

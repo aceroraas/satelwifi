@@ -4,7 +4,7 @@
     <title>Panel Admin - SatelWifi</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
     <div id="app" v-cloak class="container mx-auto p-4">
@@ -371,12 +371,10 @@
                         this.updateInterval = setInterval(() => {
                             if (this.currentTab === 'requests') {
                                 this.fetchRequests()
-                            } else if (this.currentTab === 'active-users') {
-                                this.fetchActiveUsers()
                             } else if (this.currentTab === 'logs') {
                                 this.fetchSystemLogs()
                             }
-                        }, 5000) // Actualizar cada 5 segundos en lugar de 30
+                        }, 5000)
                     },
                     stopAutoUpdate() {
                         if (this.updateInterval) {

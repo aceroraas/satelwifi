@@ -1,43 +1,49 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-3">
-        <div class="col">
-            <h2>Registros del Sistema</h2>
+<div class="container mx-auto p-4">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-2xl font-bold">Registros del Sistema</h2>
         </div>
-        <div class="col-auto">
-            <form action="{{ url_for('clear_logs') }}" method="POST" style="display: inline;">
-                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Está seguro de que desea limpiar todos los logs?')">
+        <div>
+            <form action="{{ url_for('clear_logs') }}" method="POST" class="inline">
+                <button type="submit" 
+                        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg" 
+                        onclick="return confirm('¿Está seguro de que desea limpiar todos los logs?')">
                     <i class="fas fa-trash"></i> Limpiar Logs
                 </button>
             </form>
         </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+            <thead class="bg-gray-100">
                 <tr>
-                    <th>Fecha/Hora</th>
-                    <th>Módulo</th>
-                    <th>Nivel</th>
-                    <th>Mensaje</th>
-                    <th>Origen</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Módulo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nivel</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mensaje</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origen</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-gray-200">
                 {% for log in logs %}
-                <tr class="{% if log.level == 'ERROR' %}table-danger{% elif log.level == 'WARNING' %}table-warning{% endif %}">
-                    <td>{{ log.timestamp }}</td>
-                    <td>{{ log.logger_name }}</td>
-                    <td>
-                        <span class="badge {% if log.level == 'ERROR' %}bg-danger{% elif log.level == 'WARNING' %}bg-warning{% elif log.level == 'INFO' %}bg-info{% else %}bg-secondary{% endif %}">
+                <tr class="{% if log.level == 'ERROR' %}bg-red-50{% elif log.level == 'WARNING' %}bg-yellow-50{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ log.timestamp }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ log.logger_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if log.level == 'ERROR' %}bg-red-100 text-red-800
+                            {% elif log.level == 'WARNING' %}bg-yellow-100 text-yellow-800
+                            {% elif log.level == 'INFO' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ log.level }}
                         </span>
                     </td>
-                    <td style="max-width: 500px; word-wrap: break-word;">{{ log.message }}</td>
-                    <td>{{ log.source }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 max-w-md break-words">{{ log.message }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ log.source }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -45,12 +51,15 @@
     </div>
 
     {% if total > per_page %}
-    <nav aria-label="Navegación de páginas">
-        <ul class="pagination justify-content-center">
+    <nav class="mt-4" aria-label="Navegación de páginas">
+        <ul class="flex justify-center space-x-1">
             {% set pages = ((total - 1) // per_page) + 1 %}
             {% for p in range(1, pages + 1) %}
-            <li class="page-item {% if p == page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('view_logs', page=p) }}">{{ p }}</a>
+            <li>
+                <a href="{{ url_for('view_logs', page=p) }}" 
+                   class="px-3 py-2 {% if p == page %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %} rounded">
+                    {{ p }}
+                </a>
             </li>
             {% endfor %}
         </ul>

@@ -16,6 +16,10 @@ import logging
 import re
 from telebot import types
 from pathlib import Path
+from logger_manager import get_logger
+
+# Inicializar el logger
+logger = get_logger('web_backend')
 
 # Añadir el directorio raíz al path para importar los módulos existentes
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,7 +36,13 @@ db = DatabaseManager()
 
 app = Flask(__name__)
 CORS(app)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'default-secret-key')
+
+# Configurar el logger de Flask para usar nuestro sistema centralizado
+app.logger.handlers = []
+for handler in logger.handlers:
+    app.logger.addHandler(handler)
+app.logger.setLevel(logger.level)
 
 def login_required(f):
     @wraps(f)
@@ -50,7 +60,7 @@ def process_base64_image(base64_string):
             base64_string = base64_string.split(',')[1]
         return base64_string.encode('utf-8')
     except Exception as e:
-        db.log('error', 'web', f'Error procesando imagen base64: {str(e)}')
+        logger.error(f'Error procesando imagen base64: {str(e)}')
         return None
 
 def generate_ticket():
@@ -58,7 +68,7 @@ def generate_ticket():
     try:
         return bot.generate_ticket()
     except Exception as e:
-        db.log('error', 'web', f'Error generando ticket: {str(e)}')
+        logger.error(f'Error generando ticket: {str(e)}')
         return None
 
 def load_pending_requests():
@@ -85,7 +95,31 @@ def update_request(request_id, status, ticket=None):
 # Función para obtener las solicitudes pendientes
 def get_admin_requests():
     """Obtiene todas las solicitudes pendientes"""
-    return db.get_pending_requests()
+    try:
+        requests = db.get_pending_requests()
+        requests_dict = {}
+        for request in requests:
+            # Asegurarse de que todos los campos existan y convertir bytes a base64 si es necesario
+            payment_proof = request.get('payment_proof', '')
+            if isinstance(payment_proof, bytes):
+                payment_proof = base64.b64encode(payment_proof).decode('utf-8')
+
+            request_data = {
+                'id': request.get('id', ''),
+                'username': request.get('username', ''),
+                'plan_data': request.get('plan_data', {}),
+                'payment_ref': request.get('payment_ref', ''),
+                'payment_proof': payment_proof,
+                'status': request.get('status', 'pending'),
+                'created_at': request.get('created_at', ''),
+                'source': request.get('source', 'web'),
+                'chat_id': request.get('chat_id')
+            }
+            requests_dict[request_data['id']] = request_data
+        return jsonify(requests_dict)
+    except Exception as e:
+        logger.error(f'Error al obtener solicitudes: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -137,7 +171,7 @@ def get_plans():
         return jsonify(plans)
     except Exception as e:
         print("Error in get_plans:", str(e))  # Debug
-        db.log('error', 'web', f'Error obteniendo planes: {str(e)}')
+        logger.error(f'Error obteniendo planes: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/prices')
@@ -148,7 +182,7 @@ def get_prices():
         
         return jsonify(prices)
     except Exception as e:
-        db.log('error', 'web', f'Error obteniendo precios: {str(e)}')
+        logger.error(f'Error obteniendo precios: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/submit-request', methods=['POST'])
@@ -174,7 +208,7 @@ def submit_request():
                 else:
                     payment_proof = data['paymentProof']
             except Exception as e:
-                db.log('error', 'web', f'Error procesando imagen: {str(e)}')
+                logger.error(f'Error procesando imagen: {str(e)}')
                 return jsonify({'error': 'Error procesando imagen del comprobante'}), 400
         
         # Guardar la solicitud en la base de datos
@@ -226,15 +260,15 @@ def submit_request():
                         # Enviar la imagen
                         bot.bot.send_photo(admin_id, image_stream)
                     except Exception as e:
-                        db.log('error', 'web', f'Error enviando comprobante a admin {admin_id}: {str(e)}')
+                        logger.error(f'Error enviando comprobante a admin {admin_id}: {str(e)}')
                         # Enviar mensaje de error pero continuar con la solicitud
                         bot.bot.send_message(admin_id, "❌ Error al enviar el comprobante de pago")
             except Exception as e:
-                db.log('error', 'web', f'Error enviando notificación a admin {admin_id}: {str(e)}')
+                logger.error(f'Error enviando notificación a admin {admin_id}: {str(e)}')
         
         return jsonify({'requestId': request_id})
     except Exception as e:
-        db.log('error', 'web', f'Error procesando solicitud: {str(e)}')
+        logger.error(f'Error procesando solicitud: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/check-status/<request_id>')
@@ -250,7 +284,7 @@ def check_status(request_id):
             'ticket': request_data.get('ticket', '')
         })
     except Exception as e:
-        db.log('error', 'web', f'Error verificando estado: {str(e)}')
+        logger.error(f'Error verificando estado: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/requests', methods=['GET'])
@@ -261,13 +295,17 @@ def get_admin_requests():
         requests = db.get_pending_requests()
         requests_dict = {}
         for request in requests:
-            # Asegurarse de que todos los campos existan
+            # Asegurarse de que todos los campos existan y convertir bytes a base64 si es necesario
+            payment_proof = request.get('payment_proof', '')
+            if isinstance(payment_proof, bytes):
+                payment_proof = base64.b64encode(payment_proof).decode('utf-8')
+
             request_data = {
                 'id': request.get('id', ''),
                 'username': request.get('username', ''),
                 'plan_data': request.get('plan_data', {}),
                 'payment_ref': request.get('payment_ref', ''),
-                'payment_proof': request.get('payment_proof', ''),
+                'payment_proof': payment_proof,
                 'status': request.get('status', 'pending'),
                 'created_at': request.get('created_at', ''),
                 'source': request.get('source', 'web'),
@@ -276,7 +314,7 @@ def get_admin_requests():
             requests_dict[request_data['id']] = request_data
         return jsonify(requests_dict)
     except Exception as e:
-        db.log('error', 'web', f'Error al obtener solicitudes: {str(e)}')
+        logger.error(f'Error al obtener solicitudes: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/requests/<request_id>/approve', methods=['POST'])
@@ -316,7 +354,7 @@ def approve_request(request_id):
                     parse_mode='HTML'
                 )
             except Exception as e:
-                db.log('error', 'web', f'Error notificando al usuario: {str(e)}')
+                logger.error(f'Error notificando al usuario: {str(e)}')
         
         return jsonify({
             'success': True,
@@ -324,7 +362,7 @@ def approve_request(request_id):
         })
         
     except Exception as e:
-        db.log('error', 'web', f'Error al aprobar solicitud: {str(e)}')
+        logger.error(f'Error al aprobar solicitud: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/requests/<request_id>/reject', methods=['POST'])
@@ -353,12 +391,12 @@ def reject_request(request_id):
                     " Por favor, contacta al administrador para más información."
                 )
             except Exception as e:
-                db.log('error', 'web', f'Error notificando al usuario: {str(e)}')
+                logger.error(f'Error notificando al usuario: {str(e)}')
         
         return jsonify({'success': True})
         
     except Exception as e:
-        db.log('error', 'web', f'Error al rechazar solicitud: {str(e)}')
+        logger.error(f'Error al rechazar solicitud: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/system-status')
@@ -374,7 +412,7 @@ def system_status():
             'logs': logs
         })
     except Exception as e:
-        db.log('error', 'web', f'Error al obtener estado del sistema: {str(e)}')
+        logger.error(f'Error al obtener estado del sistema: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/admin')
@@ -449,7 +487,7 @@ def get_active_users():
         
         return jsonify(formatted_users)
     except Exception as e:
-        db.log('error', 'web', f'Error obteniendo usuarios activos: {str(e)}')
+        logger.error(f'Error obteniendo usuarios activos: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/users/<username>', methods=['DELETE'])
@@ -461,13 +499,13 @@ def delete_user(username):
         if bot.mikrotik.remove_user(username):
             # Si se eliminó correctamente, eliminar de la base de datos
             db.remove_user(username)
-            db.log('info', 'web', f'Usuario {username} eliminado correctamente')
+            logger.info(f'Usuario {username} eliminado correctamente')
             return jsonify({'status': 'success'})
         else:
-            db.log('error', 'web', f'Error al eliminar usuario {username} del router')
+            logger.error(f'Error al eliminar usuario {username} del router')
             return jsonify({'error': 'Error al eliminar usuario del router'}), 500
     except Exception as e:
-        db.log('error', 'web', f'Error al eliminar usuario {username}: {str(e)}')
+        logger.error(f'Error al eliminar usuario {username}: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/refund', methods=['POST'])
@@ -507,11 +545,11 @@ def submit_refund():
             try:
                 bot.bot.send_message(admin_id, message)
             except Exception as e:
-                db.log('error', 'web', f'Error enviando mensaje a admin {admin_id}: {str(e)}')
+                logger.error(f'Error enviando mensaje a admin {admin_id}: {str(e)}')
         
         return jsonify({'status': 'success'})
     except Exception as e:
-        db.log('error', 'web', f'Error al procesar solicitud de devolución: {str(e)}')
+        logger.error(f'Error al procesar solicitud de devolución: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/system-logs')

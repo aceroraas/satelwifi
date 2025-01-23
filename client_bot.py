@@ -13,9 +13,9 @@ from config import (
 )
 from mikrotik_manager import MikrotikManager
 from database_manager import DatabaseManager
-from logging.handlers import RotatingFileHandler
 import json
 import base64
+from logger_manager import get_logger
 
 class SatelWifiBot:
     """Clase principal del bot"""
@@ -27,25 +27,7 @@ class SatelWifiBot:
         self.pending_requests = {}  # Almacenar solicitudes pendientes
         self.user_states = {}  # Almacenar estados de los usuarios
         
-        # Configurar logging
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
-        
-        # Asegurarnos de que el logger tenga handlers
-        if not self.logger.handlers:
-            # Obtener la ruta del directorio actual
-            log_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            # Handler para archivo
-            file_handler = logging.FileHandler(os.path.join(log_dir, 'client_bot.log'))
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self.logger.addHandler(file_handler)
-            
-            # Handler para consola
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            self.logger.addHandler(console_handler)
-        
+        self.logger = get_logger(__name__)
         self.logger.info("Bot inicializado")
         
         self.setup_handlers()

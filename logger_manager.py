@@ -31,8 +31,14 @@ class LoggerManager:
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
-        # Handler para archivo
+        # Handler para archivo con rotación
         log_path = Path(__file__).parent / 'satelwifi.log'
+        # Asegurarse de que no haya otros archivos de log
+        for old_log in Path(__file__).parent.glob('satelwifi.log.*'):
+            try:
+                os.remove(old_log)
+            except:
+                pass
         file_handler = logging.FileHandler(log_path)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
@@ -92,13 +98,13 @@ class DatabaseLogHandler(logging.Handler):
             conn = sqlite3.connect(self.db_path, timeout=20)
             cursor = conn.cursor()
             
-            # Mantener solo los últimos 1000 registros
+            # Mantener solo los últimos 100 registros
             cursor.execute('''
                 DELETE FROM system_logs 
                 WHERE id NOT IN (
                     SELECT id FROM system_logs 
                     ORDER BY timestamp DESC 
-                    LIMIT 1000
+                    LIMIT 100
                 )
             ''')
             

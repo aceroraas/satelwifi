@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SatelWifi - Portal de Tickets</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animate.min.css') }}"/>
+    <script src="{{ url_for('static', filename='js/vue.global.prod.js') }}"></script>
 </head>
 <body class="bg-gray-100">
     <script>
@@ -125,16 +125,18 @@
 
             <!-- Step 4: Result -->
             <div v-if="currentStep === 4" class="animate__animated animate__fadeIn">
-                <div v-if="requestStatus === 'approved'" class="text-center text-green-600">
-                    <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div v-if="requestStatus === 'approved'" class="text-center">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
-                    <h2 class="text-xl font-semibold mb-2">¡Solicitud Aprobada!</h2>
-                    <p class="mb-4">Tu ticket ha sido activado:</p>
-                    <div class="bg-green-50 p-4 rounded-lg mb-4">
-                        <p class="font-mono text-lg select-all">[[ ticket ]]</p>
+                    <h3 class="text-xl font-semibold text-green-600 mb-4">¡Ticket Aprobado!</h3>
+                    <p class="text-gray-600 mb-6">Tu solicitud ha sido aprobada. Ya puedes comenzar a usar el servicio.</p>
+                    <div class="space-y-4">
+                        <a href="https://satelwifi.com" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+                            <i class="fas fa-ticket-alt mr-2"></i>
+                            Ingresar Ticket
+                        </a>
                     </div>
-                    <p class="text-sm text-gray-600">Guarda este ticket para futuras referencias</p>
                 </div>
                 <div v-if="requestStatus === 'rejected'" class="text-center text-red-600">
                     <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

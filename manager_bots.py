@@ -6,11 +6,12 @@ import venv
 from pathlib import Path
 import time
 import signal
-import logging
-from logging.handlers import RotatingFileHandler
 import traceback
 import re
 from datetime import datetime
+from logger_manager import get_logger
+
+logger = get_logger('manager_bots')
 
 def setup_virtual_environment():
     """Configura el entorno virtual si no existe y lo activa"""
@@ -18,7 +19,7 @@ def setup_virtual_environment():
     
     # Crear entorno virtual si no existe
     if not venv_path.exists():
-        print("Creando entorno virtual...")
+        logger.info("Creando entorno virtual...")
         venv.create(venv_path, with_pip=True)
     
     # Obtener el path del python del entorno virtual
@@ -28,12 +29,12 @@ def setup_virtual_environment():
         python_path = venv_path / "bin" / "python"
     
     if not python_path.exists():
-        print("Error: No se pudo crear el entorno virtual")
+        logger.error("Error: No se pudo crear el entorno virtual")
         sys.exit(1)
 
     # Si no estamos en el entorno virtual, reejecutar el script en él
     if sys.executable != str(python_path):
-        print("Activando entorno virtual...")
+        logger.info("Activando entorno virtual...")
         subprocess.run([str(python_path), "-m", "pip", "install", "--upgrade", "pip"])
         subprocess.run([str(python_path), "-m", "pip", "install", "-r", "requirements.txt"])
         subprocess.run([str(python_path), "-m", "pip", "install", "python-dotenv"])  # Instalar python-dotenv
@@ -46,64 +47,15 @@ def setup_virtual_environment():
 setup_virtual_environment()
 from config import ADMIN_IDS  # Eliminar REFRESH_INTERVAL de la importación
 
-def setup_logging():
-    """Configura el sistema de logging unificado"""
-    # Crear el formateador para archivo (detallado)
-    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
-    # Crear el formateador para consola (simple)
-    console_formatter = logging.Formatter('%(message)s')
-    
-    # Configurar el manejador de archivo
-    file_handler = RotatingFileHandler('satelwifi.log', maxBytes=10485760, backupCount=5)
-    file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.INFO)
-    
-    # Configurar el manejador de consola
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(console_formatter)
-    console_handler.setLevel(logging.INFO)
-    
-    # Configurar el logger raíz
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
-
-    # Configurar loggers específicos con emojis
-    logger_configs = {
-        'client_bot': {'emoji': '🤖', 'name': 'Bot'},
-        'manager': {'emoji': '🛰', 'name': 'Manager'},
-        'mikrotik_manager': {'emoji': '📡', 'name': 'MikroTik'},
-        '__main__': {'emoji': '🔧', 'name': 'Sistema'}
-    }
-
-    class EmojiFilter(logging.Filter):
-        def __init__(self, emoji, name):
-            self.emoji = emoji
-            self.name = name
-            super().__init__()
-
-        def filter(self, record):
-            record.emoji = self.emoji
-            record.component = self.name
-            return True
-
-    # Crear formateador para consola con emojis
-    emoji_console_formatter = logging.Formatter('%(emoji)s %(component)s: %(message)s')
-    console_handler.setFormatter(emoji_console_formatter)
-
-    # Configurar cada logger específico
-    for logger_name, config in logger_configs.items():
-        logger = logging.getLogger(logger_name)
-        logger.addFilter(EmojiFilter(config['emoji'], config['name']))
+# Inicializar el logger centralizado
+logger.info("Iniciando Manager Bots")
 
 def kill_existing_processes():
     """Mata los procesos existentes de Python relacionados con el proyecto"""
     try:
         # Obtener el directorio del proyecto
         project_dir = os.path.dirname(os.path.abspath(__file__))
-        logging.getLogger('manager').info(f"Limpiando procesos en {project_dir}")
+        logger.info(f"Limpiando procesos en {project_dir}")
         
         # Usar pkill para matar procesos específicos
         processes_to_kill = [
@@ -115,15 +67,15 @@ def kill_existing_processes():
         for process in processes_to_kill:
             try:
                 subprocess.run(['pkill', '-f', process], check=False)
-                logging.getLogger('manager').info(f"Proceso {process} detenido")
+                logger.info(f"Proceso {process} detenido")
             except Exception as e:
-                logging.getLogger('manager').warning(f"Error al detener {process}: {str(e)}")
+                logger.warning(f"Error al detener {process}: {str(e)}")
         
         # Esperar un momento para asegurar que los procesos se detengan
         time.sleep(2)
-        logging.getLogger('manager').info("Limpieza de procesos completada")
+        logger.info("Limpieza de procesos completada")
     except Exception as e:
-        logging.getLogger('manager').error(f"Error en kill_existing_processes: {str(e)}")
+        logger.error(f"Error en kill_existing_processes: {str(e)}")
 
 class BotManager:
     """Clase para manejar el bot de Telegram"""
@@ -269,5 +221,5 @@ def main():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    setup_logging()
+    logger.info("Iniciando Manager Bots")
     main()
