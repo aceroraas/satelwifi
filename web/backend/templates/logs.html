@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Registros del Sistema</h2>
+        </div>
+        <div class="col-auto">
+            <form action="{{ url_for('clear_logs') }}" method="POST" style="display: inline;">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('¿Está seguro de que desea limpiar todos los logs?')">
+                    <i class="fas fa-trash"></i> Limpiar Logs
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Fecha/Hora</th>
+                    <th>Módulo</th>
+                    <th>Nivel</th>
+                    <th>Mensaje</th>
+                    <th>Origen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="{% if log.level == 'ERROR' %}table-danger{% elif log.level == 'WARNING' %}table-warning{% endif %}">
+                    <td>{{ log.timestamp }}</td>
+                    <td>{{ log.logger_name }}</td>
+                    <td>
+                        <span class="badge {% if log.level == 'ERROR' %}bg-danger{% elif log.level == 'WARNING' %}bg-warning{% elif log.level == 'INFO' %}bg-info{% else %}bg-secondary{% endif %}">
+                            {{ log.level }}
+                        </span>
+                    </td>
+                    <td style="max-width: 500px; word-wrap: break-word;">{{ log.message }}</td>
+                    <td>{{ log.source }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total > per_page %}
+    <nav aria-label="Navegación de páginas">
+        <ul class="pagination justify-content-center">
+            {% set pages = ((total - 1) // per_page) + 1 %}
+            {% for p in range(1, pages + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('view_logs', page=p) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

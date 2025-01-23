@@ -199,8 +199,8 @@ def submit_request():
         # Crear botones inline
         markup = types.InlineKeyboardMarkup(row_width=2)
         buttons = [
-            types.InlineKeyboardButton("✅ Aprobar", callback_data=f"approve_web_{request_id}"),
-            types.InlineKeyboardButton("❌ Rechazar", callback_data=f"reject_web_{request_id}")
+            types.InlineKeyboardButton("✅ Aprobar", callback_data=f"web_approve_{request_id}"),
+            types.InlineKeyboardButton("❌ Rechazar", callback_data=f"web_reject_{request_id}")
         ]
         markup.add(*buttons)
         

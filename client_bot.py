@@ -318,9 +318,11 @@ class SatelWifiBot:
                     self.bot.answer_callback_query(call.id, "⛔️ No tienes permiso para realizar esta acción.")
                     return
                 
-                action, request_id = call.data.split('_', 2)[1:]
-                request_data = self.db.get_request(request_id)
+                action, request_id = call.data.split('_', 2)[1:]  # web_approve_123 -> ['web', 'approve', '123']
+                self.logger.info(f"Acción web recibida: {action} para solicitud {request_id}")
                 
+                # Obtener la solicitud de la base de datos
+                request_data = self.db.get_request(request_id)
                 if not request_data:
                     self.bot.answer_callback_query(call.id, "❌ Solicitud no encontrada.")
                     return
@@ -833,8 +835,8 @@ class SatelWifiBot:
                     "❌ Error al procesar la solicitud"
                 )
 
-        # Handler para acciones de solicitudes web
-        @self.bot.callback_query_handler(func=lambda call: call.data and call.data.startswith(('approve_web_', 'reject_web_')))
+        # Manejar acciones de solicitudes web
+        @self.bot.callback_query_handler(func=lambda call: call.data and call.data.startswith(('web_approve_', 'web_reject_')))
         def handle_web_request_action(call):
             """Maneja las acciones de aprobar/rechazar solicitudes web"""
             try:
