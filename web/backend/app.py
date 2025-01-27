@@ -360,13 +360,24 @@ def approve_request(request_id):
             return jsonify({'error': 'Error generando ticket'}), 500
         
         # Crear usuario en MikroTik
-        duration = f"{request_data['plan_data']['duration']}h"
+        duration_minutes = request_data['plan_data']['duration']
+        duration_hours = duration_minutes / 60
+        duration = f"{duration_hours}h"
         if not bot.mikrotik.create_user(ticket, ticket, duration):
             return jsonify({'error': 'Error creando usuario en MikroTik'}), 500
         
         # Actualizar estado en la base de datos
         if not db.update_request_status(request_id, 'approved', ticket):
             return jsonify({'error': 'Error actualizando estado de solicitud'}), 500
+        
+        # Eliminar el comprobante de pago si existe
+        if request_data.get('payment_proof'):
+            try:
+                proof_path = Path(__file__).parent / request_data['payment_proof']
+                if proof_path.exists():
+                    os.remove(proof_path)
+            except Exception as e:
+                logger.error(f'Error eliminando comprobante de pago: {str(e)}')
         
         # Notificar al usuario si la solicitud vino del bot
         if request_data.get('chat_id'):
@@ -405,6 +416,15 @@ def reject_request(request_id):
         # Actualizar estado en la base de datos
         if not db.update_request_status(request_id, 'rejected'):
             return jsonify({'error': 'Error actualizando estado de solicitud'}), 500
+        
+        # Eliminar el comprobante de pago si existe
+        if request_data.get('payment_proof'):
+            try:
+                proof_path = Path(__file__).parent / request_data['payment_proof']
+                if proof_path.exists():
+                    os.remove(proof_path)
+            except Exception as e:
+                logger.error(f'Error eliminando comprobante de pago: {str(e)}')
         
         # Notificar al usuario si la solicitud vino del bot
         if request_data.get('chat_id'):
