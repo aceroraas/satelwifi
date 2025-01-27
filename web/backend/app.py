@@ -50,25 +50,47 @@ app.logger.setLevel(logger.level)
 UPLOAD_FOLDER = Path(__file__).parent / 'static' / 'uploads' / 'payment_proofs'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+# Crear la carpeta de uploads si no existe
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_payment_proof(base64_string):
     """Guarda una imagen de comprobante de pago y retorna la ruta"""
     try:
+        # Validar que el string base64 no esté vacío
+        if not base64_string:
+            logger.error('Base64 string está vacío')
+            return None
+            
         if ',' in base64_string:
             base64_string = base64_string.split(',')[1]
         
-        # Decodificar base64 a bytes
-        image_data = base64.b64decode(base64_string)
+        # Validar que el string base64 sea válido
+        try:
+            image_data = base64.b64decode(base64_string)
+        except Exception as e:
+            logger.error(f'Error decodificando base64: {str(e)}')
+            return None
+            
+        # Validar que los datos decodificados sean una imagen válida
+        if len(image_data) < 100:  # Tamaño mínimo para una imagen válida
+            logger.error(f'Datos de imagen muy pequeños: {len(image_data)} bytes')
+            return None
         
         # Generar nombre único para el archivo
         filename = f"{uuid.uuid4()}.jpg"
         file_path = UPLOAD_FOLDER / filename
         
         # Guardar archivo
-        with open(file_path, 'wb') as f:
-            f.write(image_data)
+        try:
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
+            logger.info(f'Comprobante guardado exitosamente: {file_path}')
+        except Exception as e:
+            logger.error(f'Error escribiendo archivo: {str(e)}')
+            return None
         
         return str(file_path.relative_to(Path(__file__).parent))
     except Exception as e:

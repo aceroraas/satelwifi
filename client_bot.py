@@ -74,12 +74,15 @@ class SatelWifiBot:
                     if not kwargs['reply_markup'].keyboard:
                         kwargs['reply_markup'] = None
             
+            # Manejar parse_mode: si viene en kwargs, usar ese, si no, usar HTML por defecto
+            parse_mode = kwargs.pop('parse_mode', 'HTML')
+            
             # Intentar enviar el mensaje
             return self.bot.send_message(
                 chat_id,
                 text,
                 reply_to_message_id=reply_to_message_id,
-                parse_mode='HTML',
+                parse_mode=parse_mode,
                 **kwargs
             )
         except telebot.apihelper.ApiException as e:
@@ -270,14 +273,21 @@ class SatelWifiBot:
                     # Si hay comprobante de pago, enviar primero la imagen
                     if request['payment_proof']:
                         try:
-                            self.bot.send_photo(
+                            # Verificar que el comprobante no esté vacío
+                            if not request['payment_proof'].strip():
+                                raise ValueError("Comprobante de pago vacío")
+                                
+                            self.logger.info(f"Intentando enviar comprobante de pago: {request['payment_proof']}")
+                            sent = self.bot.send_photo(
                                 message.chat.id,
                                 request['payment_proof'],
                                 caption="🧾 Comprobante de pago"
                             )
+                            if not sent:
+                                raise Exception("No se pudo enviar el comprobante")
                         except Exception as e:
-                            self.logger.error(f"Error enviando comprobante de pago: {str(e)}")
-                            text += "\n⚠️ Error al cargar comprobante de pago"
+                            self.logger.error(f"Error enviando comprobante de pago: {str(e)} - Valor: {request['payment_proof']}")
+                            text += "\n⚠️ Error al cargar comprobante de pago. Por favor, revisa el archivo manualmente."
                     
                     # Enviar mensaje con botones
                     self.send_message_safe(
