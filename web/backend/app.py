@@ -593,7 +593,6 @@ def delete_user(username):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/refund', methods=['POST'])
-@login_required
 def submit_refund():
     """Envía los datos de devolución a los administradores por Telegram"""
     try:

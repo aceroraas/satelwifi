@@ -1,334 +1,481 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SatelWifi - Portal de Tickets</title>
-    <link href="{{ url_for('static', filename='css/tailwind.min.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/animate.min.css') }}"/>
+    <link
+      href="{{ url_for('static', filename='css/tailwind.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/animate.min.css') }}"
+    />
     <script src="{{ url_for('static', filename='js/vue.global.prod.js') }}"></script>
-</head>
-<body class="bg-gray-100">
+  </head>
+  <body class="bg-gray-100">
     <script>
-        window.PAYMENT_INFO = {
-            bank_name: '{{ config.PAYMENT_INFO.bank_name }}',
-            account_number: '{{ config.PAYMENT_INFO.account_number }}',
-            pago_movil_bank_code: '{{ config.PAYMENT_INFO.pago_movil_bank_code }}',
-            pago_movil_phone: '{{ config.PAYMENT_INFO.pago_movil_phone }}',
-            pago_movil_identifier: '{{ config.PAYMENT_INFO.pago_movil_identifier }}'
-        };
+      window.PAYMENT_INFO = {
+        bank_name: "{{ config.PAYMENT_INFO.bank_name }}",
+        account_number: "{{ config.PAYMENT_INFO.account_number }}",
+        pago_movil_bank_code: "{{ config.PAYMENT_INFO.pago_movil_bank_code }}",
+        pago_movil_phone: "{{ config.PAYMENT_INFO.pago_movil_phone }}",
+        pago_movil_identifier:
+          "{{ config.PAYMENT_INFO.pago_movil_identifier }}",
+      };
     </script>
 
     <div id="app" class="container mx-auto px-4 py-8">
-        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-            <!-- Step 1: Plan Selection -->
-            <div v-if="currentStep === 1" class="animate__animated animate__fadeIn">
-                <h2 class="text-2xl font-bold mb-4">Selecciona tu plan</h2>
-                
-                <!-- Error message -->
-                <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                    <span class="block sm:inline">[[ error ]]</span>
-                </div>
-                
-                <!-- Loading message -->
-                <div v-if="!plansLoaded" class="text-center py-8">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                    <p class="text-gray-600">Cargando planes disponibles...</p>
-                </div>
-                
-                <!-- Plans grid -->
-                <div v-else class="grid grid-cols-2 gap-4">
-                    <div v-for="plan in plans" :key="plan.id"
-                         class="p-4 border rounded-lg cursor-pointer transition-all duration-300 hover:shadow-md"
-                         :class="{'border-blue-500 bg-blue-50': selectedPlan?.id === plan.id}"
-                         @click="selectPlan(plan)">
-                        <h3 class="font-semibold">[[ plan.name ]]</h3>
-                        <p class="text-sm text-gray-600">
-                            <span>[[ plan.duration ]] minutos</span>
-                        </p>
-                        <div class="mt-2">
-                            <p class="text-sm font-medium text-blue-600">
-                                <span>$[[ plan.price_usd ]]</span>
-                            </p>
-                            <p class="text-sm font-medium text-gray-600">
-                                <span>[[ plan.price_bs ]] Bs.</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
-                <button @click="nextStep" 
-                        :disabled="!selectedPlan"
-                        class="mt-6 w-full bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
-                    Continuar
-                </button>
-            </div>
+      <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
+        <!-- Step 1: Plan Selection -->
+        <div v-if="currentStep === 1" class="animate__animated animate__fadeIn">
+          <h2 class="text-2xl font-bold mb-4">Selecciona tu plan</h2>
 
-            <!-- Step 2: Payment Information -->
-            <div v-if="currentStep === 2" class="animate__animated animate__fadeIn">
-                <h2 class="text-2xl font-bold mb-4">Información de Pago</h2>
-                <div class="mb-4">
-                    <p class="text-gray-700 mb-2">Plan seleccionado:</p>
-                    <div class="bg-blue-50 p-4 rounded-lg mb-4">
-                        <p class="font-medium">[[ selectedPlan.name ]]</p>
-                        <p class="text-sm text-gray-600">[[ selectedPlan.duration ]] minutos</p>
-                        <p class="text-sm font-medium text-blue-600">$[[ selectedPlan.price_usd ]]</p>
-                        <p class="text-sm font-medium text-gray-600">[[ selectedPlan.price_bs ]] Bs.</p>
-                    </div>
-                    <p class="text-gray-700 mb-2">Datos Bancarios:</p>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="mb-1"><span class="font-medium">Banco:</span> [[ bank_info.bank_name ]]</p>
-                        <p class="mb-1"><span class="font-medium">Cuenta:</span> [[ bank_info.account_number ]]</p>
-                        <p class="mb-1"><span class="font-medium">Pago Móvil:</span> [[ bank_info.pago_movil_bank_code ]]</p>
-                        <p class="mb-1"><span class="font-medium">Teléfono:</span> [[ bank_info.pago_movil_phone ]]</p>
-                        <p class="mb-1"><span class="font-medium">Identificador:</span> [[ bank_info.pago_movil_identifier ]]</p>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Número de Referencia</label>
-                    <input v-model="paymentRef" type="text" 
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2"
-                           placeholder="Ingresa el número de referencia del pago">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Comprobante de Pago</label>
-                    <input @change="handleFileUpload" type="file" accept="image/*" 
-                           class="mt-1 block w-full text-sm text-gray-500
-                                  file:mr-4 file:py-2 file:px-4
-                                  file:rounded-full file:border-0
-                                  file:text-sm file:font-semibold
-                                  file:bg-blue-50 file:text-blue-700
-                                  hover:file:bg-blue-100">
-                    <p class="mt-1 text-sm text-gray-500">Sube una captura del comprobante de pago</p>
-                </div>
-                <div class="flex gap-4">
-                    <button @click="prevStep" 
-                            class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors">
-                        Atrás
-                    </button>
-                    <button @click="submitPayment" 
-                            :disabled="!paymentRef || !paymentProof"
-                            class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
-                        Enviar
-                    </button>
-                </div>
-            </div>
+          <!-- Error message -->
+          <div
+            v-if="error"
+            class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
+          >
+            <span class="block sm:inline">[[ error ]]</span>
+          </div>
 
-            <!-- Step 3: Processing -->
-            <div v-if="currentStep === 3" class="animate__animated animate__fadeIn">
-                <div class="text-center">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                    <h2 class="text-xl font-semibold mb-2">Procesando tu solicitud</h2>
-                    <p class="text-gray-600">Por favor espera mientras verificamos tu pago...</p>
-                </div>
-            </div>
+          <!-- Loading message -->
+          <div v-if="!plansLoaded" class="text-center py-8">
+            <div
+              class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"
+            ></div>
+            <p class="text-gray-600">Cargando planes disponibles...</p>
+          </div>
 
-            <!-- Step 4: Result -->
-            <div v-if="currentStep === 4" class="animate__animated animate__fadeIn">
-                <div v-if="requestStatus === 'approved'" class="text-center">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <h3 class="text-xl font-semibold text-green-600 mb-4">¡Ticket Aprobado!</h3>
-                    <p class="text-gray-600 mb-2">Tu solicitud ha sido aprobada. Ya puedes comenzar a usar el servicio.</p>
-                    
-                    <!-- Mostrar el ticket -->
-                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                        <p class="text-sm text-gray-600 mb-2">Tu ticket es:</p>
-                        <p class="text-xl font-mono bg-white p-3 rounded border select-all">[[ ticket ]]</p>
-                    </div>
-
-                    <div class="space-y-4">
-                        <a href="http://10.0.0.1" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
-                            Ingresar Ticket
-                        </a>
-                    </div>
-                </div>
-                <div v-if="requestStatus === 'rejected'" class="text-center text-red-600">
-                    <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                    <h2 class="text-xl font-semibold mb-2">Solicitud Rechazada</h2>
-                    <p>Por favor, proporciona los datos para la devolución:</p>
-                    <div class="mt-4">
-                        <textarea v-model="refundInfo" 
-                                  class="w-full p-4 border rounded-lg resize-none focus:border-blue-500 focus:ring-blue-500"
-                                  rows="4"
-                                  placeholder="Banco, tipo de cuenta, número de cuenta, titular..."></textarea>
-                        <button @click="submitRefund" 
-                                :disabled="!refundInfo.trim()"
-                                class="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors">
-                            Enviar datos de devolución
-                        </button>
-                    </div>
-                </div>
+          <!-- Plans grid -->
+          <div v-else class="grid grid-cols-2 gap-4">
+            <div
+              v-for="plan in plans"
+              :key="plan.id"
+              class="p-4 border rounded-lg cursor-pointer transition-all duration-300 hover:shadow-md"
+              :class="{'border-blue-500 bg-blue-50': selectedPlan?.id === plan.id}"
+              @click="selectPlan(plan)"
+            >
+              <h3 class="font-semibold">[[ plan.name ]]</h3>
+              <p class="text-sm text-gray-600">
+                <span>[[ plan.duration ]] minutos</span>
+              </p>
+              <div class="mt-2">
+                <p class="text-sm font-medium text-blue-600">
+                  <span>$[[ plan.price_usd ]]</span>
+                </p>
+                <p class="text-sm font-medium text-gray-600">
+                  <span>[[ plan.price_bs ]] Bs.</span>
+                </p>
+              </div>
             </div>
+          </div>
+
+          <button
+            @click="nextStep"
+            :disabled="!selectedPlan"
+            class="mt-6 w-full bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors"
+          >
+            Continuar
+          </button>
         </div>
+
+        <!-- Step 2: Payment Information -->
+        <div v-if="currentStep === 2" class="animate__animated animate__fadeIn">
+          <h2 class="text-2xl font-bold mb-4">Información de Pago</h2>
+          <div class="mb-4">
+            <p class="text-gray-700 mb-2">Plan seleccionado:</p>
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+              <p class="font-medium">[[ selectedPlan.name ]]</p>
+              <p class="text-sm text-gray-600">
+                [[ selectedPlan.duration ]] minutos
+              </p>
+              <p class="text-sm font-medium text-blue-600">
+                $[[ selectedPlan.price_usd ]]
+              </p>
+              <p class="text-sm font-medium text-gray-600">
+                [[ selectedPlan.price_bs ]] Bs.
+              </p>
+            </div>
+            <p class="text-gray-700 mb-2">Datos Bancarios:</p>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="mb-1">
+                <span class="font-medium">Banco:</span> [[ bank_info.bank_name
+                ]]
+              </p>
+              <p class="mb-1">
+                <span class="font-medium">Cuenta:</span> [[
+                bank_info.account_number ]]
+              </p>
+              <p class="mb-1">
+                <span class="font-medium">Pago Móvil:</span> [[
+                bank_info.pago_movil_bank_code ]]
+              </p>
+              <p class="mb-1">
+                <span class="font-medium">Teléfono:</span> [[
+                bank_info.pago_movil_phone ]]
+              </p>
+              <p class="mb-1">
+                <span class="font-medium">Identificador:</span> [[
+                bank_info.pago_movil_identifier ]]
+              </p>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700"
+              ><strong>Número de Referencia</strong></label
+            >
+            <input
+              v-model="paymentRef"
+              type="text"
+              autofocus
+              class="mt-1 block w-full rounded-md focused shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2"
+              placeholder="Ingresa el número de referencia del pago"
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700"
+              ><strong
+                >Comprobante de Pago<br />
+                (SOLO TRANSFERENCIAS O PAGO MOVIL)</strong
+              ></label
+            >
+            <br />
+            <input
+              @change="handleFileUpload"
+              type="file"
+              accept="image/*"
+              class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            <p class="mt-1 text-sm text-gray-500">
+              Sube una captura del comprobante de pago
+            </p>
+          </div>
+
+          <br />
+          <div class="flex gap-4">
+            <button
+              @click="prevStep"
+              class="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Atrás
+            </button>
+            <button
+              @click="submitPayment"
+              :disabled="!paymentRef"
+              class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors"
+            >
+              Enviar
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Processing -->
+        <div v-if="currentStep === 3" class="animate__animated animate__fadeIn">
+          <div class="text-center">
+            <div
+              class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"
+            ></div>
+            <h2 class="text-xl font-semibold mb-2">Procesando tu solicitud</h2>
+            <p class="text-gray-600">
+              Por favor espera mientras verificamos tu pago...
+            </p>
+          </div>
+        </div>
+        <!-- Agregar justo antes del <script> tag -->
+        <!-- Mensaje de éxito -->
+        <div
+          v-if="showSuccessMessage"
+          class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50"
+        >
+          <div
+            class="bg-white rounded-lg p-6 shadow-xl max-w-sm mx-auto animate__animated animate__fadeIn"
+          >
+            <svg
+              class="w-16 h-16 mx-auto text-green-500 mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              ></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-center mb-2">
+              ¡Datos Enviados!
+            </h3>
+            <p class="text-gray-600 text-center">
+              Tus datos de devolución han sido enviados correctamente.
+            </p>
+          </div>
+        </div>
+        <!-- Step 4: Result -->
+        <div v-if="currentStep === 4" class="animate__animated animate__fadeIn">
+          <div v-if="requestStatus === 'approved'" class="text-center">
+            <svg
+              class="w-16 h-16 mx-auto mb-4 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              ></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-green-600 mb-4">
+              ¡Ticket Aprobado!
+            </h3>
+            <p class="text-gray-600 mb-2">
+              Tu solicitud ha sido aprobada. Ya puedes comenzar a usar el
+              servicio.
+            </p>
+
+            <!-- Mostrar el ticket -->
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+              <p class="text-sm text-gray-600 mb-2">Tu ticket es:</p>
+              <p
+                class="text-xl font-mono bg-white p-3 rounded border select-all"
+              >
+                [[ ticket ]]
+              </p>
+            </div>
+
+            <div class="space-y-4">
+              <a
+                href="http://10.0.0.1"
+                target="_blank"
+                class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
+              >
+                Ingresar Ticket
+              </a>
+            </div>
+          </div>
+          <div
+            v-if="requestStatus === 'rejected'"
+            class="text-center text-red-600"
+          >
+            <svg
+              class="w-16 h-16 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+            <h2 class="text-xl font-semibold mb-2">Solicitud Rechazada</h2>
+            <p>Por favor, proporciona los datos para la devolución:</p>
+            <div class="mt-4">
+              <textarea
+                v-model="refundInfo"
+                class="w-full p-4 border rounded-lg resize-none focus:border-blue-500 focus:ring-blue-500"
+                rows="4"
+                placeholder="Banco, tipo de cuenta, número de cuenta, titular..."
+              ></textarea>
+              <button
+                @click="submitRefund"
+                :disabled="!refundInfo.trim()"
+                class="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-lg disabled:opacity-50 hover:bg-blue-600 transition-colors"
+              >
+                Enviar datos de devolución
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
-        const app = Vue.createApp({
-            delimiters: ['[[', ']]'],
-            data() {
-                return {
-                    currentStep: 1,
-                    requestId: null,
-                    checkStatusInterval: null,
-                    refundInfo: '',
-                    plans: [],
-                    plansLoaded: false,
-                    selectedPlan: null,
-                    paymentRef: '',
-                    paymentProof: null,
-                    requestStatus: null,
-                    ticket: null,
-                    error: null,
-                    bank_info: window.PAYMENT_INFO
-                }
-            },
-            methods: {
-                async fetchPlans() {
-                    try {
-                        console.log('Fetching plans...');
-                        const response = await fetch('/api/plans');
-                        console.log('Response:', response);
-                        
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        
-                        const data = await response.json();
-                        console.log('Plans data:', data);
-                        
-                        if (Array.isArray(data)) {
-                            this.plans = data;
-                            this.plansLoaded = true;
-                            console.log('Plans loaded:', this.plans);
-                        } else {
-                            console.error('Invalid plans data:', data);
-                            this.error = 'Error cargando los planes';
-                        }
-                    } catch (error) {
-                        console.error('Error fetching plans:', error);
-                        this.error = 'Error cargando los planes';
-                    }
-                },
-                selectPlan(plan) {
-                    console.log('Selecting plan:', plan);
-                    this.selectedPlan = plan;
-                },
-                nextStep() {
-                    this.currentStep++;
-                },
-                prevStep() {
-                    this.currentStep--;
-                },
-                handleFileUpload(event) {
-                    const file = event.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            this.paymentProof = e.target.result;
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                },
-                async submitPayment() {
-                    try {
-                        const response = await fetch('/api/submit-request', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                plan: this.selectedPlan,
-                                paymentRef: this.paymentRef,
-                                paymentProof: this.paymentProof
-                            })
-                        });
-                        const data = await response.json();
-                        if (response.ok) {
-                            this.requestId = data.requestId;
-                            this.currentStep = 3;
-                            this.startStatusCheck();
-                        } else {
-                            this.error = data.error || 'Error al enviar la solicitud';
-                        }
-                    } catch (error) {
-                        console.error('Error submitting payment:', error);
-                        this.error = 'Error al enviar la solicitud';
-                    }
-                },
-                async checkStatus() {
-                    try {
-                        const response = await fetch(`/api/check-status/${this.requestId}`);
-                        const data = await response.json();
-                        
-                        if (data.error) {
-                            this.error = data.error;
-                            return;
-                        }
-                        
-                        this.requestStatus = data.status;
-                        if (data.ticket) {
-                            this.ticket = data.ticket;
-                        }
-                        
-                        if (data.status === 'approved' || data.status === 'rejected') {
-                            this.currentStep = 4;
-                            this.stopStatusCheck();
-                        }
-                    } catch (error) {
-                        console.error('Error checking status:', error);
-                        this.error = 'Error al verificar el estado de la solicitud';
-                    }
-                },
-                startStatusCheck() {
-                    this.checkStatusInterval = setInterval(this.checkStatus, 5000);
-                },
-                stopStatusCheck() {
-                    if (this.checkStatusInterval) {
-                        clearInterval(this.checkStatusInterval);
-                    }
-                },
-                async submitRefund() {
-                    try {
-                        const response = await fetch('/api/admin/refund', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                requestId: this.requestId,
-                                username: this.ticket,
-                                reason: 'Solicitud rechazada',
-                                amount: this.selectedPlan.price_usd,
-                                comments: this.refundInfo
-                            })
-                        });
-                        
-                        if (response.ok) {
-                            alert('Datos de devolución enviados correctamente');
-                        } else {
-                            const data = await response.json();
-                            this.error = data.error || 'Error al enviar los datos de devolución';
-                        }
-                    } catch (error) {
-                        console.error('Error submitting refund:', error);
-                        this.error = 'Error al enviar los datos de devolución';
-                    }
-                }
-            },
-            mounted() {
-                console.log('Component mounted');
-                this.fetchPlans();
-            },
-            beforeUnmount() {
-                this.stopStatusCheck();
-            }
-        });
+      const app = Vue.createApp({
+        delimiters: ["[[", "]]"],
+        data() {
+          return {
+            currentStep: 1,
+            requestId: null,
+            checkStatusInterval: null,
+            refundInfo: "",
+            plans: [],
+            plansLoaded: false,
+            selectedPlan: null,
+            paymentRef: "",
+            paymentProof: null,
+            paymentProofText: "",
+            requestStatus: null,
+            ticket: null,
+            error: null,
+            bank_info: window.PAYMENT_INFO,
+            showSuccessMessage: false,
+          };
+        },
+        methods: {
+          async fetchPlans() {
+            try {
+              console.log("Fetching plans...");
+              const response = await fetch("/api/plans");
+              console.log("Response:", response);
 
-        app.mount('#app');
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+
+              const data = await response.json();
+              console.log("Plans data:", data);
+
+              if (Array.isArray(data)) {
+                this.plans = data;
+                this.plansLoaded = true;
+                console.log("Plans loaded:", this.plans);
+              } else {
+                console.error("Invalid plans data:", data);
+                this.error = "Error cargando los planes";
+              }
+            } catch (error) {
+              console.error("Error fetching plans:", error);
+              this.error = "Error cargando los planes";
+            }
+          },
+          selectPlan(plan) {
+            console.log("Selecting plan:", plan);
+            this.selectedPlan = plan;
+          },
+          nextStep() {
+            this.currentStep++;
+          },
+          prevStep() {
+            this.currentStep--;
+          },
+          handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                this.paymentProof = e.target.result;
+              };
+              reader.readAsDataURL(file);
+            }
+          },
+          async submitPayment() {
+            try {
+              const response = await fetch("/api/submit-request", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  plan: this.selectedPlan,
+                  paymentRef: this.paymentRef,
+                  paymentProof: this.paymentProof || this.paymentProofText,
+                }),
+              });
+              const data = await response.json();
+              if (response.ok) {
+                this.requestId = data.requestId;
+                this.currentStep = 3;
+                this.startStatusCheck();
+              } else {
+                this.error = data.error || "Error al enviar la solicitud";
+              }
+            } catch (error) {
+              console.error("Error submitting payment:", error);
+              this.error = "Error al enviar la solicitud";
+            }
+          },
+          async checkStatus() {
+            try {
+              const response = await fetch(
+                `/api/check-status/${this.requestId}`
+              );
+              const data = await response.json();
+
+              if (data.error) {
+                this.error = data.error;
+                return;
+              }
+
+              this.requestStatus = data.status;
+              if (data.ticket) {
+                this.ticket = data.ticket;
+              }
+
+              if (data.status === "approved" || data.status === "rejected") {
+                this.currentStep = 4;
+                this.stopStatusCheck();
+              }
+            } catch (error) {
+              console.error("Error checking status:", error);
+              this.error = "Error al verificar el estado de la solicitud";
+            }
+          },
+          startStatusCheck() {
+            this.checkStatusInterval = setInterval(this.checkStatus, 5000);
+          },
+          stopStatusCheck() {
+            if (this.checkStatusInterval) {
+              clearInterval(this.checkStatusInterval);
+            }
+          },
+          async submitRefund() {
+            try {
+              const response = await fetch("/api/admin/refund", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  requestId: this.requestId,
+                  username: this.ticket,
+                  reason: "Solicitud rechazada",
+                  amount: this.selectedPlan.price_usd,
+                  comments: this.refundInfo,
+                }),
+              });
+
+              if (response.ok) {
+                this.showSuccessMessage = true;
+                setTimeout(() => {
+                  window.location.reload();
+                }, 2000);
+              } else {
+                const data = await response.json();
+                this.error =
+                  data.error || "Error al enviar los datos de devolución";
+              }
+            } catch (error) {
+              console.error("Error submitting refund:", error);
+              this.error = "Error al enviar los datos de devolución";
+            }
+          },
+        },
+        mounted() {
+          console.log("Component mounted");
+          this.fetchPlans();
+        },
+        beforeUnmount() {
+          this.stopStatusCheck();
+        },
+      });
+
+      app.mount("#app");
     </script>
-</body>
+    <style>
+      .form-control-file,
+      .form-control {
+        border: 2px solid #666;
+        padding: 8px;
+        border-radius: 4px;
+        width: 100%;
+      }
+    </style>
+  </body>
 </html>
