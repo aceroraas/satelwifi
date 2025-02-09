@@ -400,7 +400,77 @@ class SatelWifiBot:
             except Exception as e:
                 self.logger.error(f"Error manejando acción web: {str(e)}")
                 self.bot.answer_callback_query(call.id, "❌ Error procesando la acción")
-    
+
+        # Generar ticket (admin)
+        @self.bot.message_handler(func=lambda message: message.text == "🎫 Generar Ticket" and self.is_admin(message.from_user.id))
+        def admin_generate_ticket(message):
+            """Permite a los administradores generar tickets manualmente"""
+            if not self.is_admin(message.from_user.id):
+                self.reply_safe(message, "⛔️ No tienes permiso para usar este comando.")
+                return
+
+            try:
+                # Crear markup con los planes disponibles
+                markup = types.InlineKeyboardMarkup()
+                for hours in time_plans:
+                    btn_text = f"{hours}h"
+                    callback_data = f"admin_gen_{hours}"
+                    markup.add(types.InlineKeyboardButton(btn_text, callback_data=callback_data))
+                
+                self.reply_safe(
+                    message,
+                    "🎫 Selecciona la duración del ticket a generar:",
+                    reply_markup=markup
+                )
+            except Exception as e:
+                self.logger.error(f"Error en admin_generate_ticket: {str(e)}")
+                self.reply_safe(message, "❌ Error al mostrar opciones. Por favor, intenta nuevamente.")
+
+        # Callback para generar ticket (admin)
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('admin_gen_'))
+        def handle_admin_generate_ticket(call):
+            """Maneja la generación de tickets por parte del admin"""
+            try:
+                if not self.is_admin(call.from_user.id):
+                    self.bot.answer_callback_query(call.id, "⛔️ No tienes permiso para realizar esta acción.")
+                    return
+
+                # Extraer duración del plan
+                _, _, hours = call.data.split('_')  # admin_gen_24 -> ['admin', 'gen', '24']
+                duration = f"{hours}h"
+                
+                # Generar ticket
+                ticket = self.generate_ticket()
+                
+                # Crear usuario en MikroTik
+                if self.mikrotik.create_user(ticket, ticket, duration):
+                    # Crear mensaje de confirmación
+                    message_text = f"""✅ Ticket Generado
+
+🎫 Ticket: <code>{ticket}</code>
+⏱ Duración: {duration}
+📅 Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
+                    
+                    try:
+                        # Actualizar mensaje original
+                        self.bot.edit_message_text(
+                            chat_id=call.message.chat.id,
+                            message_id=call.message.message_id,
+                            text=message_text,
+                            parse_mode='HTML'
+                        )
+                        self.bot.answer_callback_query(call.id, "✅ Ticket generado correctamente")
+                    except Exception as e:
+                        self.logger.error(f"Error actualizando mensaje: {str(e)}")
+                        # Si falla la edición, enviar nuevo mensaje
+                        self.send_message_safe(call.message.chat.id, message_text, parse_mode='HTML')
+                else:
+                    self.bot.answer_callback_query(call.id, "❌ Error al crear usuario en MikroTik")
+                    self.logger.error("Error al crear usuario en MikroTik")
+            except Exception as e:
+                self.logger.error(f"Error en handle_admin_generate_ticket: {str(e)}")
+                self.bot.answer_callback_query(call.id, "❌ Error al generar ticket")
+
     def notify_admins_expired_users(self, expired_users):
         """Notifica a los administradores sobre usuarios cuyo tiempo restante ha expirado"""
         for admin_id in ADMIN_IDS:
