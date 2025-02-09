@@ -40,6 +40,16 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'default-secret-key')
 
+# Configuración de producción
+app.config['ENV'] = 'production'
+app.config['DEBUG'] = False
+app.config['TESTING'] = False
+app.config['PROPAGATE_EXCEPTIONS'] = True
+
+# Deshabilitar los logs de Werkzeug excepto errores
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.ERROR)
+
 # Configurar el logger de Flask para usar nuestro sistema centralizado
 app.logger.handlers = []
 for handler in logger.handlers:
@@ -680,4 +690,4 @@ def serve_image(filename):
         return 'Imagen no encontrada', 404
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)

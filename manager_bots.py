@@ -133,10 +133,17 @@ class BotManager:
         try:
             logger.info("Iniciando servidor web...")
             os.chdir(os.path.join(self.base_dir, 'web'))
+            
+            # Configurar variables de entorno para producción
+            env = os.environ.copy()
+            env['FLASK_ENV'] = 'production'
+            env['FLASK_DEBUG'] = '0'
+            
             self.web_process = subprocess.Popen(
                 [sys.executable, 'run.py'],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                env=env
             )
             os.chdir(self.base_dir)
             logger.info("Servidor web iniciado exitosamente")
