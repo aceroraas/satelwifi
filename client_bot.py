@@ -196,29 +196,23 @@ class SatelWifiBot:
                 text = "👥 *Usuarios Activos:*\n\n"
                 for user in users:
                     if user.get('user') and user['user'] != 'default-trial':
-                        # Información básica
+                        # Usuario
                         text += f"🎫 *Usuario:* `{user['user']}`\n"
                         
-                        # Usuario de Telegram
-                        telegram_user = user.get('telegram_user', 'No disponible')
-                        text += f"👤 *Telegram:* {telegram_user}\n"
+                        # Estado (activo/inactivo)
+                        is_active = user.get('is_active', False)
+                        status = "🟢 Activo" if is_active else "🔴 Inactivo"
+                        text += f"📡 *Estado:* {status}\n"
                         
                         # Tiempo de conexión
-                        uptime = user.get('uptime', 'N/A')
+                        uptime = user.get('total_time_consumed', 'N/A')
                         text += f"⏱ *Tiempo conectado:* {uptime}\n"
                         
                         # Tiempo del ticket y restante
-                        ticket_time = user.get('ticket_time', 'N/A')
+                        ticket_time = user.get('uptime', 'N/A')
                         time_left = user.get('time_left', 'N/A')
                         text += f"🎟 *Tiempo total:* {ticket_time}\n"
                         text += f"⏳ *Tiempo restante:* {time_left}\n"
-                        
-                        # Uso de datos
-                        bytes_in = float(user.get('bytes-in', 0)) / (1024*1024)  # Convertir a MB
-                        bytes_out = float(user.get('bytes-out', 0)) / (1024*1024)  # Convertir a MB
-                        text += f"📥 *Datos recibidos:* {bytes_in:.2f} MB\n"
-                        text += f"📤 *Datos enviados:* {bytes_out:.2f} MB\n"
-                        text += f"📊 *Total datos:* {(bytes_in + bytes_out):.2f} MB\n"
                         
                         # Separador entre usuarios
                         text += "\n" + "─" * 20 + "\n\n"
