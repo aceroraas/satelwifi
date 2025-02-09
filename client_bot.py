@@ -487,14 +487,11 @@ class SatelWifiBot:
 
 if __name__ == "__main__":
     try:
-        # Limpiar logs al inicio
-        open('client_bot.log', 'w').close()  # Limpiar log del bot
-        open('manager.log', 'w').close()     # Limpiar log del manager
-        
-        logger = logging.getLogger(__name__)
+        logger = get_logger('client_bot')
         logger.info("Iniciando bot...")
         bot = SatelWifiBot()
         bot.run()
     except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error principal: {str(e)}")
+        logger.error(f"Error iniciando el bot: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.exit(1)

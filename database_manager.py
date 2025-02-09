@@ -3,27 +3,18 @@ import logging
 import json
 from datetime import datetime
 from pathlib import Path
+from logger_manager import get_logger
 
 class DatabaseManager:
     """Clase para gestionar la base de datos SQLite"""
     
     def __init__(self, db_path=None):
-        """Inicializa la conexión a la base de datos"""
         if db_path is None:
             db_path = Path(__file__).parent / 'satelwifi.db'
         self.db_path = db_path
+        self.logger = get_logger('database')
         self.setup_database()
         
-        # Configurar logging
-        self.logger = logging.getLogger('database')
-        if not self.logger.handlers:
-            handler = logging.FileHandler('database.log')
-            handler.setFormatter(logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            ))
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
-    
     def get_connection(self):
         """Obtiene una conexión a la base de datos"""
         return sqlite3.connect(self.db_path)

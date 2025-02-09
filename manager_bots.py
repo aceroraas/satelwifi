@@ -92,64 +92,46 @@ class BotManager:
 
     def handle_shutdown(self, signum, frame):
         """Maneja el apagado graceful del bot y el servidor web"""
-        print("\n🛰 : Deteniendo servicios...")
+        logger.info("Deteniendo servicios...")
         self.should_run = False
         self.stop_bot()
         self.stop_web()
-        
-        # Limpiar todos los archivos de log
-        log_files = [
-            'satelwifi.log',
-            'client_bot.log',
-            'manager.log',
-            'mikrotik_manager.log'
-        ]
-        
-        print("Limpiando archivos de log...")
-        for log_file in log_files:
-            try:
-                if os.path.exists(log_file):
-                    open(log_file, 'w').close()
-                    print(f"✓ {log_file} limpiado")
-            except Exception as e:
-                print(f"✗ Error al limpiar {log_file}: {e}")
-        
-        print("Servicios detenidos y logs limpiados.")
+        logger.info("Servicios detenidos.")
         sys.exit(0)
 
     def start_bot(self):
         """Inicia el bot de Telegram"""
         try:
-            print("🛰 : Iniciando bot...")
+            logger.info("Iniciando bot...")
             self.bot_process = subprocess.Popen(
                 [sys.executable, 'client_bot.py'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            print("🛰 : Bot iniciado exitosamente")
+            logger.info("Bot iniciado exitosamente")
         except Exception as e:
-            print(f"🛰 : Error al iniciar el bot: {e}")
+            logger.error(f"Error al iniciar el bot: {e}")
 
     def stop_bot(self):
         """Detiene el proceso del bot"""
         if self.bot_process:
-            print("🛰 : Deteniendo bot...")
+            logger.info("Deteniendo bot...")
             try:
                 self.bot_process.terminate()
                 try:
                     self.bot_process.wait(timeout=5)
-                    print("🛰 : Bot detenido exitosamente")
+                    logger.info("Bot detenido exitosamente")
                 except subprocess.TimeoutExpired:
-                    print("🛰 : No se pudo obtener la salida del proceso, procediendo a terminar")
+                    logger.info("No se pudo obtener la salida del proceso, procediendo a terminar")
                     self.bot_process.kill()
-                    print("🛰 : Bot detenido exitosamente")
+                    logger.info("Bot detenido exitosamente")
             except Exception as e:
-                print(f"🛰 : Error al detener el bot: {e}")
+                logger.error(f"Error al detener el bot: {e}")
 
     def start_web(self):
         """Inicia el servidor web Flask"""
         try:
-            print("🔧 : Iniciando servidor web...")
+            logger.info("Iniciando servidor web...")
             os.chdir(os.path.join(self.base_dir, 'web'))
             self.web_process = subprocess.Popen(
                 [sys.executable, 'run.py'],
@@ -157,9 +139,9 @@ class BotManager:
                 stderr=subprocess.PIPE
             )
             os.chdir(self.base_dir)
-            print("🔧 : Servidor web iniciado exitosamente")
+            logger.info("Servidor web iniciado exitosamente")
         except Exception as e:
-            print(f"🔧 : Error al iniciar el servidor web: {e}")
+            logger.error(f"Error al iniciar el servidor web: {e}")
             os.chdir(self.base_dir)
 
     def stop_web(self):
@@ -169,16 +151,16 @@ class BotManager:
                 self.web_process.terminate()
                 try:
                     self.web_process.wait(timeout=5)
-                    print("🔧 : Servidor web detenido")
+                    logger.info("Servidor web detenido")
                 except subprocess.TimeoutExpired:
                     self.web_process.kill()
-                    print("🔧 : Servidor web detenido forzosamente")
+                    logger.info("Servidor web detenido forzosamente")
             except Exception as e:
-                print(f"🔧 : Error al detener el servidor web: {e}")
+                logger.error(f"Error al detener el servidor web: {e}")
 
     def run(self):
         """Ejecuta el manager"""
-        print("🛰 : Iniciando BotManager...")
+        logger.info("Iniciando BotManager...")
         
         # Iniciar el bot y el servidor web
         self.start_bot()
@@ -189,27 +171,11 @@ class BotManager:
             while self.should_run:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\n🛰 : Deteniendo BotManager...")
+            logger.info("Deteniendo BotManager...")
             self.handle_shutdown(None, None)
 
 def main():
     try:
-        # Limpiar logs al inicio
-        log_files = [
-            'satelwifi.log',
-            'client_bot.log',
-            'manager.log',
-            'mikrotik_manager.log'
-        ]
-        
-        print("Limpiando archivos de log anteriores...")
-        for log_file in log_files:
-            try:
-                if os.path.exists(log_file):
-                    open(log_file, 'w').close()
-            except Exception as e:
-                print(f"Error al limpiar {log_file}: {e}")
-        
         # Matar procesos existentes
         kill_existing_processes()
         
@@ -217,8 +183,9 @@ def main():
         manager = BotManager()
         manager.run()
     except Exception as e:
-        print(f"Error: {e}")
-        traceback.print_exc()
+        logger.error(f"Error en main: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.exit(1)
 
 if __name__ == "__main__":
     logger.info("Iniciando Manager Bots")
