@@ -134,25 +134,6 @@
               placeholder="Ingresa el número de referencia del pago"
             />
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700"
-              ><strong
-                >Comprobante de Pago<br />
-                (SOLO TRANSFERENCIAS O PAGO MOVIL)</strong
-              ></label
-            >
-            <br />
-            <input
-              @change="handleFileUpload"
-              type="file"
-              accept="image/*"
-              class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-            <p class="mt-1 text-sm text-gray-500">
-              Sube una captura del comprobante de pago
-            </p>
-          </div>
-
           <br />
           <div class="flex gap-4">
             <button
@@ -357,16 +338,6 @@
           },
           prevStep() {
             this.currentStep--;
-          },
-          handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                this.paymentProof = e.target.result;
-              };
-              reader.readAsDataURL(file);
-            }
           },
           async submitPayment() {
             try {
