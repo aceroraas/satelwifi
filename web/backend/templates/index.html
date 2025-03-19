@@ -178,6 +178,9 @@
               class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"
             ></div>
             <h2 class="text-xl font-semibold mb-2">Procesando tu solicitud</h2>
+            <p class="text-blue-600 text-lg font-semibold" v-if="requestId">
+              Solicitud ID: <strong> [[ requestId ]] </strong>
+            </p>
             <p class="text-gray-600">
               Por favor espera mientras verificamos tu pago...
             </p>

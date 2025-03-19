@@ -21,7 +21,7 @@ exchange_rate = float(os.getenv('EXCHANGE_RATE', '53.85'))  # Tasa de cambio USD
 fixed_price_usd = float(os.getenv('FIXED_PRICE_USD', '0.185701021'))  # Precio fijo por hora en USD
 
 # Planes disponibles en horas
-time_plans = [1, 2,3, 4, 5,6,12,24]
+time_plans = [1, 2,3, 4, 5,6,7,8,9,10,11,12,24]
 
 def calculate_prices():
     """Calcula los precios para cada plan"""
