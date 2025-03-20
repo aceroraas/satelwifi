@@ -44,7 +44,7 @@ class SatelWifiBot:
         """Retorna el markup correspondiente según el tipo de usuario"""
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         if is_admin:
-            markup.row("👥 Usuarios Activos")
+            markup.row("👥 Usuarios Activos", "👥 Usuarios Inactivos", "👥 Usuarios Sin Tiempo")
             markup.row("📝 Solicitudes Pendientes", "🎫 Generar Ticket")
         else:
             markup.row("🎫 Solicitar Ticket")
@@ -196,33 +196,124 @@ class SatelWifiBot:
                 text = "─" * 10 + "\n"
                 for user in users:
                     if user.get('user') and user['user'] != 'default-trial':
-                        # Ticket
-                        text += f"🎫 *Ticket:* `{user['user']}`\n"
-                        ticket_time = user.get('uptime', 'N/A')
-                        text += f"🎟 *Horas:* {ticket_time}\n"
-                        # Estado (activo/inactivo)
                         is_active = user.get('is_active', False)
-                        status = "🟢" if is_active else "🔴"
-                        text += f"📡 *Estado:* {status}\n"
-                        # Tiempo de conexión
                         uptime = user.get('total_time_consumed', 'N/A')
-                        text += f"⏱ *Consumido:* {uptime}\n"
-                        # Tiempo del ticket y restante
-                        time_left = user.get('time_left', 'N/A')
-                        text += f"⏳ *Restante:* {time_left}\n"
-                        # Fecha de creación
-                        created_at=user.get('created_at','N/A')
-                        text += f"*Fecha:* {created_at}\n"
-                        # Aprobado por
+                        ticket_time = user.get('uptime', 'N/A')
                         created_by=user.get('created_by','N/A')
-                        text += f"*Aprobado:* {created_by}\n"
-                        # Separador entre usuarios
-                        text += "─" * 10 + "\n"
+                        created_at=user.get('created_at','N/A')
+                        time_left = user.get('time_left', 'N/A')
+                        if is_active:
+                            # Ticket
+                            text += f"🎫 *Ticket:* `{user['user']}`\n"
+                            # Tiempo del ticket y restante
+                            text += f"⏱ *Horas:* {ticket_time}\n"
+                            # Tiempo de conexión
+                            text += f"📡 *Consumido:* {uptime}\n"
+                            # Tiempo del ticket y restante
+                            text += f"⏳ *Restante:* {time_left}\n"
+                            # Fecha de creación
+                            text += f"*Fecha:* {created_at}\n"
+                            # Aprobado por
+                            text += f"*Aprobado:* {created_by}\n"
+                            # Separador entre usuarios
+                            text += "─" * 10 + "\n"
                 # Enviar mensaje con parse_mode markdown para el formato
                 self.reply_safe(message, text, parse_mode='Markdown')
             except Exception as e:
                 self.logger.error(f"Error mostrando usuarios activos: {str(e)}")
                 self.reply_safe(message, "❌ Error al mostrar usuarios activos. Por favor, intenta nuevamente.")
+
+        # Ver usuarios inactivos
+        @self.bot.message_handler(func=lambda message: message.text == "👥 Usuarios Inactivos" and self.is_admin(message.from_user.id))
+        def show_inactive_users(message):
+            """Muestra los usuarios inactivos"""
+            if not self.is_admin(message.from_user.id):
+                self.reply_safe(message, "⛔️ No tienes permiso para usar este comando.")
+                return
+
+            try:
+                # Obtener usuarios activos
+                users = self.mikrotik.get_active_users()
+                
+                if not users:
+                    self.reply_safe(message, "📝 No hay usuarios activos en este momento.")
+                    return
+
+                # Crear mensaje con la información de usuarios
+                text = "─" * 10 + "\n"
+                for user in users:
+                    if user.get('user') and user['user'] != 'default-trial':
+                        is_active = user.get('is_active', False)
+                        uptime = user.get('total_time_consumed', 'N/A')
+                        ticket_time = user.get('uptime', 'N/A')
+                        created_by=user.get('created_by','N/A')
+                        created_at=user.get('created_at','N/A')
+                        time_left = user.get('time_left', 'N/A')
+                        if not is_active and ticket_time != uptime:
+                            # Ticket
+                            text += f"🎫 *Ticket:* `{user['user']}`\n"
+                            text += f"⏱ *Horas:* {ticket_time}\n"
+                            # Tiempo de conexión
+                            text += f"📡 *Consumido:* {uptime}\n"
+                            # Tiempo del ticket y restante
+                            text += f"⏳ *Restante:* {time_left}\n"
+                            # Fecha de creación
+                            text += f"*Fecha:* {created_at}\n"
+                            # Aprobado por
+                            text += f"*Aprobado:* {created_by}\n"
+                            # Separador entre usuarios
+                            text += "─" * 10 + "\n"
+                # Enviar mensaje con parse_mode markdown para el formato
+                self.reply_safe(message, text, parse_mode='Markdown')
+            except Exception as e:
+                self.logger.error(f"Error mostrando usuarios inactivos: {str(e)}")
+                self.reply_safe(message, "❌ Error al mostrar usuarios inactivos. Por favor, intenta nuevamente.")
+
+         # Ver usuarios sin tiempo
+        @self.bot.message_handler(func=lambda message: message.text == "👥 Usuarios Sin Tiempo" and self.is_admin(message.from_user.id))
+        def show_users_without_time(message):
+            """Muestra los usuarios sin tiempo"""
+            if not self.is_admin(message.from_user.id):
+                self.reply_safe(message, "⛔️ No tienes permiso para usar este comando.")
+                return
+
+            try:
+                # Obtener usuarios activos
+                users = self.mikrotik.get_active_users()
+                
+                if not users:
+                    self.reply_safe(message, "📝 No hay usuarios activos en este momento.")
+                    return
+
+                # Crear mensaje con la información de usuarios
+                text = "─" * 10 + "\n"
+                for user in users:
+                    if user.get('user') and user['user'] != 'default-trial':
+                        is_active = user.get('is_active', False)
+                        uptime = user.get('total_time_consumed', 'N/A')
+                        ticket_time = user.get('uptime', 'N/A')
+                        created_by=user.get('created_by','N/A')
+                        created_at=user.get('created_at','N/A')
+                        time_left = user.get('time_left', 'N/A')
+                        if not is_active and ticket_time == uptime:
+                            # Ticket
+                            text += f"🎫 *Ticket:* `{user['user']}`\n"
+                            text += f"⏱ *Horas:* {ticket_time}\n"
+                            # Tiempo de conexión
+                            text += f"📡 *Consumido:* {uptime}\n"
+                            # Tiempo del ticket y restante
+                            text += f"⏳ *Restante:* {time_left}\n"
+                            # Fecha de creación
+                            text += f"*Fecha:* {created_at}\n"
+                            # Aprobado por
+                            text += f"*Aprobado:* {created_by}\n"
+                            # Separador entre usuarios
+                            text += "─" * 10 + "\n"
+                # Enviar mensaje con parse_mode markdown para el formato
+                self.reply_safe(message, text, parse_mode='Markdown')
+            except Exception as e:
+                self.logger.error(f"Error mostrando usuarios sin tiempo: {str(e)}")
+                self.reply_safe(message, "❌ Error al mostrar usuarios sin tiempo. Por favor, intenta nuevamente.")
         
         # Ver solicitudes pendientes
         @self.bot.message_handler(func=lambda message: message.text == "📝 Solicitudes Pendientes" and self.is_admin(message.from_user.id))
@@ -465,16 +556,7 @@ class SatelWifiBot:
             except Exception as e:
                 self.logger.error(f"Error en handle_admin_generate_ticket: {str(e)}")
                 self.bot.answer_callback_query(call.id, "❌ Error al generar ticket")
-
-    def notify_admins_expired_users(self, expired_users):
-        """Notifica a los administradores sobre usuarios cuyo tiempo restante ha expirado"""
-        for admin_id in ADMIN_IDS:
-            for user in expired_users:
-                self.send_message_safe(
-                    admin_id,
-                    f"⏳ El tiempo del usuario {user['user']} ha expirado.\n"
-                    f"Por favor, considera eliminarlo manualmente si no se elimina automáticamente."
-                )
+    
     
     def run(self):
         """Inicia el bot"""
