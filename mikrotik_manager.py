@@ -96,11 +96,14 @@ class MikrotikManager:
                 created_at = "Unknown"
                 created_by = "Unknown"
                 try:
+                    if username == 'default-trial':
+                        continue
+                    
                     if user.get('comment'):
                         telegram_match = re.search(r'@(\w+)', user.get('comment', ''))
                         if telegram_match:
                             telegram_user = f"@{telegram_match.group(1)}"
-                        create_at_match = re.search(r'created_at: ([\d{4}-\d{2}-\d{2}]+)', user.get('comment', ''))
+                        create_at_match = re.search(r'created_at: (\d{4}-\d{2}-\d{2})', user.get('comment', ''))
                         if create_at_match:
                             created_at = create_at_match.group(1)
                         created_by_match = re.search(r'created_by: (\w+)', user.get('comment', ''))

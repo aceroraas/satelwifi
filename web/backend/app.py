@@ -573,6 +573,8 @@ def get_active_users():
                 'timeLeft': formatted_left,
                 'ipAddress': user.get('address', 'Sin IP'),
                 'status': 'active' if user.get('is_active', False) else 'inactive'
+                'created_by': user.get('created_by', 'Unknown'),
+                'created_at': user.get('created_at', 'Unknown')
             }
             formatted_users.append(formatted_user)
         
