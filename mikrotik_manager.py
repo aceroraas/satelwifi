@@ -100,13 +100,13 @@ class MikrotikManager:
                         continue
                     
                     if user.get('comment'):
-                        telegram_match = re.search(r'@(\w+)', user.get('comment', ''))
+                        telegram_match = re.search(r'user: (@?\w+)', user.get('comment', ''))
                         if telegram_match:
-                            telegram_user = f"@{telegram_match.group(1)}"
+                            telegram_user = f"{telegram_match.group(1)}"
                         create_at_match = re.search(r'created_at: (\d{4}-\d{2}-\d{2})', user.get('comment', ''))
                         if create_at_match:
                             created_at = create_at_match.group(1)
-                        created_by_match = re.search(r'created_by: (\w+)', user.get('comment', ''))
+                        created_by_match = re.search(r'created_by: (@?\w+)', user.get('comment', ''))
                         if created_by_match:
                             created_by = created_by_match.group(1)
                 except Exception as e:
@@ -208,7 +208,13 @@ class MikrotikManager:
                 return False
 
             logger.info(f"Creando usuario {username} con límite de tiempo {limit_uptime}")
-            comment=f"@{userTelegram} created_at: {datetime.now().strftime('%Y-%m-%d')} created_by: {createdBy}"
+            if userTelegram != 'Web': 
+                userTelegram = f"@{userTelegram}"
+            
+            if createdBy != 'Web': 
+                createdBy = f"@{createdBy}"
+
+            comment=f"user: {userTelegram} created_at: {datetime.now().strftime('%Y-%m-%d')} created_by: {createdBy}"
             self.api.get_resource("/ip/hotspot/user").add(
                 name=username,
                 password=password,

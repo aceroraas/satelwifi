@@ -395,7 +395,7 @@ def approve_request(request_id):
         duration_minutes = request_data['plan_data']['duration']
         duration_hours = duration_minutes / 60
         duration = f"{duration_hours}h"
-        if not bot.mikrotik.create_user(ticket, ticket, duration, 'Usuario Web', "Aprobado Web"):
+        if not bot.mikrotik.create_user(ticket, ticket, duration, 'Web', 'Web'):
             return jsonify({'error': 'Error creando usuario en MikroTik'}), 500
         
         # Actualizar estado en la base de datos
@@ -528,10 +528,12 @@ def get_active_users():
         # Formatear la información de los usuarios
         formatted_users = []
         for user in users:
+            if user.get('username', '') == 'default-trial':
+                continue
             # Obtener tiempos del usuario
             ticket_time = user.get('uptime', '0s')  # Tiempo total del ticket
             consumed_time = user.get('total_time_consumed', '0s')  # Tiempo consumido
-            remaining_time = user.get('time_left', 'Sin límite')  # Tiempo restante
+            remaining_time = user.get('time_left', '0s')  # Tiempo restante
             
             # Formatear tiempo total del ticket
             if not ticket_time or ticket_time == '0s':
@@ -551,18 +553,6 @@ def get_active_users():
                 except:
                     formatted_uptime = 'Error en formato'
             
-            # Formatear tiempo restante
-            if not remaining_time:
-                formatted_left = 'Sin límite'
-            elif remaining_time == 'sin límite':
-                formatted_left = 'Sin límite'
-            elif remaining_time == '0s':
-                formatted_left = 'Agotado'
-            else:
-                try:
-                    formatted_left = remaining_time  # Ya viene formateado del MikrotikManager
-                except:
-                    formatted_left = 'Error en formato'
             
             formatted_user = {
                 'username': user.get('user', 'Sin nombre'),
@@ -570,11 +560,11 @@ def get_active_users():
                 'isActive': user.get('is_active', False),
                 'uptime': formatted_uptime,
                 'totalTime': formatted_total,
-                'timeLeft': formatted_left,
+                'timeLeft': remaining_time,
                 'ipAddress': user.get('address', 'Sin IP'),
-                'status': 'active' if user.get('is_active', False) else 'inactive'
-                'created_by': user.get('created_by', 'Unknown'),
-                'created_at': user.get('created_at', 'Unknown')
+                'status': 'active' if user.get('is_active', False) else 'inactive',
+                'createdBy': user.get('created_by', 'Unknown'),
+                'createdAt': user.get('created_at', 'Unknown')
             }
             formatted_users.append(formatted_user)
         

@@ -28,7 +28,7 @@ class SatelWifiBot:
         self.user_states = {}  # Almacenar estados de los usuarios
         
         self.logger = get_logger(__name__)
-        self.logger.info("Bot inicializado")
+        self.logger.info("Inicializando Bot... m2")
         
         self.setup_handlers()
         
@@ -416,8 +416,8 @@ class SatelWifiBot:
                     duration_minutes = request_data['plan_data']['duration']
                     duration_hours = duration_minutes / 60
                     duration = f"{duration_hours}h"
-                    
-                    if self.mikrotik.create_user(ticket, ticket, duration,'Usuario Web',call.from_user.id):
+                    userTelegram = call.from_user.username if call.from_user.username else call.from_user.id
+                    if self.mikrotik.create_user(ticket, ticket, duration,'Web',userTelegram):
                         # Actualizar estado en la base de datos
                         self.db.update_request_status(request_id, 'approved', ticket)
                         
@@ -529,7 +529,9 @@ class SatelWifiBot:
                 ticket = self.generate_ticket()
                 
                 # Crear usuario en MikroTik
-                if self.mikrotik.create_user(ticket, ticket, duration, call.from_user.id,call.from_user.id):
+                userTelegram = call.from_user.username if call.from_user.username else call.from_user.id
+                userMessage = call.message.chat.username if call.message.chat.username else call.message.chat.id
+                if self.mikrotik.create_user(ticket, ticket, duration, userMessage,userTelegram):
                     # Crear mensaje de confirmación
                     message_text = f"""✅ Ticket Generado
 
@@ -560,9 +562,10 @@ class SatelWifiBot:
     
     def run(self):
         """Inicia el bot"""
-        self.logger.info("Iniciando bot...")
+        self.logger.info("Bot Inicializado... m3")
         while True:
             try:
+                self.logger.info("Bot Ready Escuchando... m4")
                 self.bot.polling(none_stop=True, interval=0)
             except Exception as e:
                 self.logger.error(f"Error en polling: {str(e)}")
@@ -571,7 +574,7 @@ class SatelWifiBot:
 if __name__ == "__main__":
     try:
         logger = get_logger('client_bot')
-        logger.info("Iniciando bot...")
+        logger.info("Obteniendo bot... m1")
         bot = SatelWifiBot()
         bot.run()
     except Exception as e:

@@ -101,11 +101,13 @@
                     <thead>
                         <tr class="bg-gray-100">
                             <th class="px-4 py-2">Usuario</th>
-                            <th class="px-4 py-2">Telegram</th>
+                            <th class="px-4 py-2">Fecha de creación</th>
+                            <th class="px-4 py-2">Aprobado por</th>
+                            <th class="px-4 py-2">Telegram / Web</th>
                             <th class="px-4 py-2">Estado</th>
-                            <th class="px-4 py-2">Tiempo Consumido</th>
-                            <th class="px-4 py-2">Tiempo Total</th>
-                            <th class="px-4 py-2">Tiempo Restante</th>
+                            <th class="px-4 py-2">Consumido</th>
+                            <th class="px-4 py-2">Plan</th>
+                            <th class="px-4 py-2">Restante</th>
                             <th class="px-4 py-2">IP</th>
                             <th class="px-4 py-2">Acciones</th>
                         </tr>
@@ -113,11 +115,23 @@
                     <tbody>
                         <tr v-for="user in activeUsers" :key="user.username" 
                             :class="{
+                                'bg-red-100': user.totalTime === user.uptime,
                                 'bg-green-50': user.isActive,
                                 'hover:bg-gray-50': !user.isActive,
+                                'bg-yellow-100': user.uptime === 'Sin actividad',
                                 'border-b': true
                             }">
                             <td class="px-4 py-2 font-medium">[[ user.username ]]</td>
+                            <td class="px-4 py-2">
+                                <span :class="{'text-blue-600': user.createdAt !== 'Unknown'}">
+                                    [[ user.createdAt  === 'Unknown' ? 'No registrado' : user.createdAt ]]
+                                </span>
+                            </td>
+                            <td class="px-4 py-2">
+                                <span :class="{'text-blue-600': user.createdBy !== 'Unknown'}">
+                                    [[ user.createdBy  === 'Unknown' ? 'No registrado' : user.createdBy ]]
+                                </span>
+                            </td>
                             <td class="px-4 py-2">
                                 <span :class="{'text-blue-600': user.telegramUser !== 'Unknown'}">
                                     [[ user.telegramUser === 'Unknown' ? 'No registrado' : user.telegramUser ]]
@@ -127,9 +141,10 @@
                                 <span :class="{
                                     'px-2 py-1 rounded-full text-sm font-medium': true,
                                     'bg-green-100 text-green-800': user.isActive,
-                                    'bg-gray-100 text-gray-800': !user.isActive
+                                    'bg-gray-100 text-gray-800': !user.isActive,
+                                    'bg-red-100 text-gray-800': user.totalTime === user.uptime
                                 }">
-                                    [[ user.isActive ? 'Conectado' : 'Desconectado' ]]
+                                    [[ user.isActive ? 'Conectado' : user.totalTime === user.uptime ? 'Sin Tiempo' : 'Desconectado' ]]
                                 </span>
                             </td>
                             <td class="px-4 py-2" :class="{'text-gray-500': user.uptime === 'Sin actividad'}">
@@ -138,15 +153,12 @@
                             <td class="px-4 py-2" :class="{'text-gray-500': user.totalTime === 'Sin límite'}">
                                 [[ user.totalTime ]]
                             </td>
-                            <td class="px-4 py-2" 
-                                :class="{
-                                    'text-red-600': user.timeLeft === 'Agotado',
-                                    'text-gray-500': user.timeLeft === 'Sin límite' || user.timeLeft === 'Error en formato',
-                                    'font-medium': user.isActive && user.timeLeft !== 'Agotado' && user.timeLeft !== 'Sin límite'
-                                }">
-                                [[ user.timeLeft ]]
+                            <td class="px-4 py-2" >
+                                <span >
+                                    [[  user.totalTime == user.uptime ? '0s' : user.timeLeft  ]]
+                                </span>
                             </td>
-                            <td class="px-4 py-2" :class="{'text-gray-500': user.ipAddress === 'Sin IP'}">
+                            <td class="px-4 py-2" :class="{'text-gray-500': user.ipAddress === 'N/A'}">
                                 [[ user.ipAddress ]]
                             </td>
                             <td class="px-4 py-2">
