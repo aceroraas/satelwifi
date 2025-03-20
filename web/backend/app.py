@@ -395,7 +395,7 @@ def approve_request(request_id):
         duration_minutes = request_data['plan_data']['duration']
         duration_hours = duration_minutes / 60
         duration = f"{duration_hours}h"
-        if not bot.mikrotik.create_user(ticket, ticket, duration):
+        if not bot.mikrotik.create_user(ticket, ticket, duration, 'Usuario Web', "Aprobado Web"):
             return jsonify({'error': 'Error creando usuario en MikroTik'}), 500
         
         # Actualizar estado en la base de datos
@@ -531,7 +531,7 @@ def get_active_users():
             # Obtener tiempos del usuario
             ticket_time = user.get('uptime', '0s')  # Tiempo total del ticket
             consumed_time = user.get('total_time_consumed', '0s')  # Tiempo consumido
-            remaining_time = user.get('time_left', 'sin límite')  # Tiempo restante
+            remaining_time = user.get('time_left', 'Sin límite')  # Tiempo restante
             
             # Formatear tiempo total del ticket
             if not ticket_time or ticket_time == '0s':

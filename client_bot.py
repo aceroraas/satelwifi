@@ -193,30 +193,31 @@ class SatelWifiBot:
                     return
 
                 # Crear mensaje con la información de usuarios
-                text = "👥 *Usuarios Activos:*\n\n"
+                text = "─" * 10 + "\n"
                 for user in users:
                     if user.get('user') and user['user'] != 'default-trial':
-                        # Usuario
-                        text += f"🎫 *Usuario:* `{user['user']}`\n"
-                        
+                        # Ticket
+                        text += f"🎫 *Ticket:* `{user['user']}`\n"
+                        ticket_time = user.get('uptime', 'N/A')
+                        text += f"🎟 *Horas:* {ticket_time}\n"
                         # Estado (activo/inactivo)
                         is_active = user.get('is_active', False)
-                        status = "🟢 Activo" if is_active else "🔴 Inactivo"
+                        status = "🟢" if is_active else "🔴"
                         text += f"📡 *Estado:* {status}\n"
-                        
                         # Tiempo de conexión
                         uptime = user.get('total_time_consumed', 'N/A')
-                        text += f"⏱ *Tiempo conectado:* {uptime}\n"
-                        
+                        text += f"⏱ *Consumido:* {uptime}\n"
                         # Tiempo del ticket y restante
-                        ticket_time = user.get('uptime', 'N/A')
                         time_left = user.get('time_left', 'N/A')
-                        text += f"🎟 *Tiempo total:* {ticket_time}\n"
-                        text += f"⏳ *Tiempo restante:* {time_left}\n"
-                        
+                        text += f"⏳ *Restante:* {time_left}\n"
+                        # Fecha de creación
+                        created_at=user.get('created_at','N/A')
+                        text += f"*Fecha:* {created_at}\n"
+                        # Aprobado por
+                        created_by=user.get('created_by','N/A')
+                        text += f"*Aprobado:* {created_by}\n"
                         # Separador entre usuarios
-                        text += "\n" + "─" * 20 + "\n\n"
-
+                        text += "─" * 10 + "\n"
                 # Enviar mensaje con parse_mode markdown para el formato
                 self.reply_safe(message, text, parse_mode='Markdown')
             except Exception as e:
@@ -325,7 +326,7 @@ class SatelWifiBot:
                     duration_hours = duration_minutes / 60
                     duration = f"{duration_hours}h"
                     
-                    if self.mikrotik.create_user(ticket, ticket, duration):
+                    if self.mikrotik.create_user(ticket, ticket, duration,'Usuario Web',call.from_user.id):
                         # Actualizar estado en la base de datos
                         self.db.update_request_status(request_id, 'approved', ticket)
                         
@@ -437,7 +438,7 @@ class SatelWifiBot:
                 ticket = self.generate_ticket()
                 
                 # Crear usuario en MikroTik
-                if self.mikrotik.create_user(ticket, ticket, duration):
+                if self.mikrotik.create_user(ticket, ticket, duration, call.from_user.id,call.from_user.id):
                     # Crear mensaje de confirmación
                     message_text = f"""✅ Ticket Generado
 

@@ -4,6 +4,7 @@ from config import MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASSWORD
 import re
 import traceback
 from logger_manager import get_logger
+from datetime import datetime
 
 # Usar el nuevo sistema de logging centralizado
 logger = get_logger('mikrotik_manager')
@@ -92,11 +93,19 @@ class MikrotikManager:
 
                 # Intentar obtener el usuario de Telegram
                 telegram_user = "Unknown"
+                created_at = "Unknown"
+                created_by = "Unknown"
                 try:
                     if user.get('comment'):
                         telegram_match = re.search(r'@(\w+)', user.get('comment', ''))
                         if telegram_match:
                             telegram_user = f"@{telegram_match.group(1)}"
+                        create_at_match = re.search(r'created_at: ([\d{4}-\d{2}-\d{2}]+)', user.get('comment', ''))
+                        if create_at_match:
+                            created_at = create_at_match.group(1)
+                        created_by_match = re.search(r'created_by: (\w+)', user.get('comment', ''))
+                        if created_by_match:
+                            created_by = created_by_match.group(1)
                 except Exception as e:
                     logger.error(f"Error obteniendo usuario de Telegram para {username}: {str(e)}")
 
@@ -108,7 +117,9 @@ class MikrotikManager:
                     'is_active': is_active,
                     'address': active_dict[username].get('address', 'N/A') if is_active else 'N/A',
                     'id': user.get('.id', ''),
-                    'total_time_consumed': uptime if is_active else user.get('uptime', '0s')
+                    'total_time_consumed': uptime if is_active else user.get('uptime', '0s'),
+                    'created_at': created_at,
+                    'created_by': created_by
                 })
             
             return formatted_users
@@ -119,31 +130,6 @@ class MikrotikManager:
         finally:
             self.disconnect()
     
-    def format_active_users(self, users):
-        """Formatear lista de usuarios activos para mostrar"""
-        if not users:
-            return "No hay usuarios activos"
-        
-        response = "<b>📊 Usuarios Activos</b>\n\n"
-        for user in users:
-            status = "🟢" if user['is_active'] else "⚪️"
-            telegram = user['telegram'] if user['telegram'] != "Unknown" else "No registrado"
-            
-            # Calcular tiempo restante
-            time_left = user['time_left']
-            total_time_consumed = user['total_time_consumed']
-            ticket_time = user['uptime']
-            
-            response += (
-                f"{status} <b>Usuario:</b> <code>{user['user']}</code>\n"
-                f"👤 <b>Telegram:</b> {telegram}\n"
-                f"⏱ <b>Tiempo de ticket:</b> {ticket_time}\n"
-                f"⏱ <b>Tiempo consumido:</b> {total_time_consumed}\n"
-                f"⏳ <b>Tiempo restante:</b> {time_left}\n"
-                f"📍 <b>IP:</b> {user['address']}\n"
-                "••••••••••\n"
-            )
-        return response
     
     def remove_user(self, username):
         """Elimina un usuario y asegura su desconexión completa"""
@@ -211,7 +197,7 @@ class MikrotikManager:
             self.disconnect()
             logger.info(f"Proceso de eliminación finalizado para usuario {username}")
     
-    def create_user(self, username, password, limit_uptime):
+    def create_user(self, username, password, limit_uptime, userTelegram, createdBy):
         """Crea un nuevo usuario"""
         try:
             if not self.connect():
@@ -219,52 +205,19 @@ class MikrotikManager:
                 return False
 
             logger.info(f"Creando usuario {username} con límite de tiempo {limit_uptime}")
+            comment=f"@{userTelegram} created_at: {datetime.now().strftime('%Y-%m-%d')} created_by: {createdBy}"
             self.api.get_resource("/ip/hotspot/user").add(
                 name=username,
                 password=password,
                 limit_uptime=limit_uptime,
-                profile="5M"  # Asignar perfil 5M a todos los usuarios
+                profile="5M",  # Asignar perfil 5M a todos los usuarios
+                comment=comment
             )
-            logger.info(f"Usuario {username} creado con perfil 5M")
+            logger.info(f"Usuario {username} creado con perfil 5M y comentario {comment}")
             return True
         except Exception as e:
             logger.error(f"Error creando usuario: {str(e)}\n{traceback.format_exc()}")
             return False
-        finally:
-            self.disconnect()
-    
-    def check_and_remove_expired_users(self):
-        """Verifica y elimina usuarios cuyo tiempo restante ha expirado"""
-        try:
-            # Conectar a MikroTik
-            self.connect()
-            
-            # Obtener usuarios y conexiones activas
-            users = self.api.get_resource("/ip/hotspot/user").get()
-            active_connections = self.api.get_resource("/ip/hotspot/active").get()
-            
-            # Crear diccionario de conexiones activas para búsqueda rápida
-            active_dict = {conn.get('user', ''): conn for conn in active_connections}
-            
-            for user in users:
-                username = user.get('name', '')
-                is_active = username in active_dict
-                
-                # Obtener información de tiempo
-                time_left = user.get('limit-uptime', 'sin límite')
-                total_time_consumed = user.get('uptime', '0s')
-                
-                # Verificar si el tiempo restante es 0 o negativo
-                if time_left != 'sin límite' and self.time_to_seconds(time_left) <= 0:
-                    # Verificar si ha pasado más de 1 minuto desde que se acabó el tiempo
-                    if self.time_to_seconds(total_time_consumed) - self.time_to_seconds(time_left) > 60:
-                        logger.info(f"Eliminando usuario {username} por tiempo expirado")
-                        self.remove_user(username)
-                    else:
-                        logger.warning(f"Usuario {username} con tiempo expirado, pero no ha pasado más de 1 minuto")
-            
-        except Exception as e:
-            logger.error(f"Error verificando usuarios expirados: {str(e)}")
         finally:
             self.disconnect()
 
